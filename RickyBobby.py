@@ -932,6 +932,7 @@ async def _rank_autoplay_candidates(state: GuildMusicState, current: SongEntry) 
         banned_terms = [
             "grand prize", "winner", "giveaway", "contest", "reaction", "prank", "trailer",
             "full movie", "interview", "podcast", "episode", "highlights", "gameplay",
+            "official music video", "music video",
         ]
         if any(term in lowered_title for term in banned_terms):
             return False
@@ -1341,13 +1342,30 @@ async def play_next_async(guild_id: int, loop: asyncio.AbstractEventLoop):
             seed_song = state.previous_finished
     if not state.queue and state.autoplay and seed_song:
         try:
-            r = await fetch_related_song(state, seed_song)
-            if r:
+            for _ in range(5):
+                r = await fetch_related_song(state, seed_song)
+                if not r:
+                    break
                 auto_entry = SongEntry(
                     title=r["title"], url=r["url"], webpage_url=r["webpage_url"],
                     duration=r.get("duration") or 0, requester=seed_song.requester)
                 auto_entry.force_local = True
-                state.queue.append(auto_entry)
+                try:
+                    auto_entry.local_path = await asyncio.wait_for(
+                        loop.run_in_executor(None, lambda: _download_audio_file(auto_entry)), timeout=45.0)
+                except asyncio.TimeoutError:
+                    auto_entry.local_path = None
+                if auto_entry.local_path and os.path.exists(auto_entry.local_path):
+                    state.queue.append(auto_entry)
+                    break
+                # Mark failed autoplay candidate so the next fetch picks a different track.
+                bad_id = _entry_identity(r)
+                if bad_id:
+                    state.recent_track_ids.append(bad_id)
+                bad_key = _song_core_key(r.get("title", ""))
+                if bad_key:
+                    state.recent_title_keys.append(bad_key)
+                print(f"[Autoplay] Skipping unplayable candidate: {r.get('title', 'Unknown')}", flush=True)
         except Exception as e:
             print(f"[Autoplay] Failed: {e}")
     _loop = asyncio.get_running_loop()
