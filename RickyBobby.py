@@ -34,8 +34,8 @@ print(f"   Log channel: {LOG_CHANNEL_ID if LOG_CHANNEL_ID else 'Not set'}")
 
 # Intents
 intents = discord.Intents.default()
-# We need message content to read Disboard confirmation messages.
-intents.message_content = True
+# Keep privileged intents disabled so startup always succeeds.
+intents.message_content = False
 intents.members = False
 
 # Bot setup
