@@ -1156,11 +1156,10 @@ async def play_next_async(guild_id: int, loop: asyncio.AbstractEventLoop):
 # ---------------------------------------------------------------------------
 
 class MusicControlView(discord.ui.View):
-    def __init__(self, guild_id: int):
+    def __init__(self):
         super().__init__(timeout=None)
-        self.guild_id = guild_id
 
-    @discord.ui.button(emoji="⏯️", label="Pause / Resume", style=discord.ButtonStyle.primary, row=0)
+    @discord.ui.button(emoji="⏯️", label="Pause / Resume", style=discord.ButtonStyle.primary, row=0, custom_id="gzv_pause_resume")
     async def pause_resume(self, interaction: discord.Interaction, button: discord.ui.Button):
         vc = interaction.guild.voice_client
         if not vc:
@@ -1175,7 +1174,7 @@ class MusicControlView(discord.ui.View):
         else:
             await interaction.response.send_message("Nothing is playing right now.", ephemeral=True)
 
-    @discord.ui.button(emoji="⏭️", label="Skip Track", style=discord.ButtonStyle.secondary, row=0)
+    @discord.ui.button(emoji="⏭️", label="Skip Track", style=discord.ButtonStyle.secondary, row=0, custom_id="gzv_skip")
     async def skip_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         vc = interaction.guild.voice_client
         if not vc or (not vc.is_playing() and not vc.is_paused()):
@@ -1184,9 +1183,9 @@ class MusicControlView(discord.ui.View):
         vc.stop()
         await interaction.response.send_message("⏭️ Skipped.", ephemeral=True)
 
-    @discord.ui.button(emoji="⏹️", label="Stop Session", style=discord.ButtonStyle.danger, row=0)
+    @discord.ui.button(emoji="⏹️", label="Stop Session", style=discord.ButtonStyle.danger, row=0, custom_id="gzv_stop")
     async def stop_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
-        state = get_music_state(self.guild_id)
+        state = get_music_state(interaction.guild_id)
         vc = interaction.guild.voice_client
         if not vc:
             await interaction.response.send_message("Not connected to voice.", ephemeral=True)
@@ -1202,9 +1201,9 @@ class MusicControlView(discord.ui.View):
             state.now_playing_msg = None
         await interaction.response.send_message("⏹️ Stopped and queue cleared.", ephemeral=True)
 
-    @discord.ui.button(emoji="📋", label="Queue Snapshot", style=discord.ButtonStyle.secondary, row=1)
+    @discord.ui.button(emoji="📋", label="Queue Snapshot", style=discord.ButtonStyle.secondary, row=1, custom_id="gzv_queue")
     async def queue_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
-        state = get_music_state(self.guild_id)
+        state = get_music_state(interaction.guild_id)
         if not state.current and not state.queue:
             await interaction.response.send_message("The queue is empty.", ephemeral=True)
             return
@@ -1222,17 +1221,17 @@ class MusicControlView(discord.ui.View):
         embed.set_footer(text="GzVibe Panel • Live Queue")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @discord.ui.button(emoji="🔉", label="Vol -10%", style=discord.ButtonStyle.secondary, row=1)
+    @discord.ui.button(emoji="🔉", label="Vol -10%", style=discord.ButtonStyle.secondary, row=1, custom_id="gzv_vol_down")
     async def vol_down(self, interaction: discord.Interaction, button: discord.ui.Button):
-        state = get_music_state(self.guild_id)
+        state = get_music_state(interaction.guild_id)
         state.volume = max(0.0, round(state.volume - 0.1, 2))
         if state.source_transformer:
             state.source_transformer.volume = state.volume
         await interaction.response.send_message(f"🔉 Volume: {int(state.volume * 100)}%", ephemeral=True)
 
-    @discord.ui.button(emoji="🔊", label="Vol +10%", style=discord.ButtonStyle.secondary, row=1)
+    @discord.ui.button(emoji="🔊", label="Vol +10%", style=discord.ButtonStyle.secondary, row=1, custom_id="gzv_vol_up")
     async def vol_up(self, interaction: discord.Interaction, button: discord.ui.Button):
-        state = get_music_state(self.guild_id)
+        state = get_music_state(interaction.guild_id)
         state.volume = min(1.0, round(state.volume + 0.1, 2))
         if state.source_transformer:
             state.source_transformer.volume = state.volume
@@ -1240,7 +1239,7 @@ class MusicControlView(discord.ui.View):
 
     @discord.ui.button(emoji="🔁", label="Autoplay: OFF", style=discord.ButtonStyle.secondary, row=2, custom_id="autoplay_toggle")
     async def autoplay_toggle(self, interaction: discord.Interaction, button: discord.ui.Button):
-        state = get_music_state(self.guild_id)
+        state = get_music_state(interaction.guild_id)
         state.autoplay = not state.autoplay
         button.label = f"Autoplay: {'ON' if state.autoplay else 'OFF'}"
         button.style = discord.ButtonStyle.success if state.autoplay else discord.ButtonStyle.secondary
@@ -1251,7 +1250,7 @@ class MusicControlView(discord.ui.View):
 
     @discord.ui.button(emoji="🎚️", label="Mode: GzVibe", style=discord.ButtonStyle.success, row=2, custom_id="autoplay_mode_toggle")
     async def autoplay_mode_toggle(self, interaction: discord.Interaction, button: discord.ui.Button):
-        state = get_music_state(self.guild_id)
+        state = get_music_state(interaction.guild_id)
         state.autoplay_mode = "balanced" if state.autoplay_mode == "gzvibe" else "gzvibe"
         button.label = f"Mode: {_format_autoplay_mode(state.autoplay_mode)}"
         button.style = _autoplay_mode_button_style(state.autoplay_mode)
@@ -1260,7 +1259,7 @@ class MusicControlView(discord.ui.View):
 
     @discord.ui.button(emoji="✨", label="Save To Playlist", style=discord.ButtonStyle.primary, row=2, custom_id="playlist_quick_add")
     async def playlist_quick_add(self, interaction: discord.Interaction, button: discord.ui.Button):
-        state = get_music_state(self.guild_id)
+        state = get_music_state(interaction.guild_id)
         song = state.current or (state.queue[0] if state.queue else None)
         if not song:
             await interaction.response.send_message("No song available to save.", ephemeral=True)
@@ -1282,19 +1281,19 @@ class MusicControlView(discord.ui.View):
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
-async def _post_music_panel(guild_id: int, force_new: bool = False):
+async def _post_music_panel(guild_id: int, force_new: bool = False,
+                            channel: discord.TextChannel | None = None):
     state = get_music_state(guild_id)
     guild = bot.get_guild(guild_id)
     if not guild or not state.current:
         return
-    # Find the music channel: look for a channel named "music-commands", "music", or any text channel
-    music_ch = None
-    for name in ("🎵┃music-commands", "music-commands", "music"):
-        music_ch = discord.utils.get(guild.text_channels, name=name)
-        if music_ch:
-            break
+    music_ch = channel
     if not music_ch:
-        # Fall back to first text channel
+        for name in ("🎵┃music-commands", "music-commands", "music"):
+            music_ch = discord.utils.get(guild.text_channels, name=name)
+            if music_ch:
+                break
+    if not music_ch:
         if guild.text_channels:
             music_ch = guild.text_channels[0]
     if not music_ch:
@@ -1326,7 +1325,7 @@ async def _post_music_panel(guild_id: int, force_new: bool = False):
         footer_parts.append(f"🔁 Autoplay ON • {_format_autoplay_mode(state.autoplay_mode)}")
     embed.set_footer(text="  ✦  ".join(footer_parts) if footer_parts else "GzVibe Deck • Controls Live")
 
-    view = MusicControlView(guild_id)
+    view = MusicControlView()
     for child in view.children:
         if getattr(child, "custom_id", None) == "autoplay_toggle":
             child.label = f"Autoplay: {'ON' if state.autoplay else 'OFF'}"
@@ -1383,6 +1382,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 @bot.event
 async def on_ready():
     print(f"[GzVibe] {bot.user} is online! Build: {STARTUP_MARKER}", flush=True)
+    bot.add_view(MusicControlView())
     if GUILD_ID:
         bot.tree.copy_global_to(guild=GUILD_ID)
         synced = await bot.tree.sync(guild=GUILD_ID)
@@ -1439,14 +1439,14 @@ async def play(interaction: discord.Interaction, query: str):
             _loop = asyncio.get_running_loop()
             await play_next(interaction.guild.id, _loop)
             await interaction.followup.send(f"▶️ Starting **{entry.title}** — see the player below!", ephemeral=True)
-            await _post_music_panel(interaction.guild.id, force_new=True)
+            await _post_music_panel(interaction.guild.id, force_new=True, channel=interaction.channel)
         else:
             embed = discord.Embed(title="Added to Queue",
                                    description=f"[{entry.title}]({entry.webpage_url})", color=0x3498DB)
             embed.add_field(name="Position", value=str(len(state.queue)))
             embed.add_field(name="Duration", value=entry.format_duration())
             await interaction.followup.send(embed=embed)
-            await _post_music_panel(interaction.guild.id)
+            await _post_music_panel(interaction.guild.id, channel=interaction.channel)
     except Exception as e:
         print(f"[Play] Error: {traceback.format_exc()}")
         try:
@@ -1571,7 +1571,7 @@ async def nowplaying(interaction: discord.Interaction):
                     inline=False)
     embed.set_footer(text="GzVibe Live View")
     await interaction.response.send_message(embed=embed)
-    await _post_music_panel(interaction.guild.id, force_new=True)
+    await _post_music_panel(interaction.guild.id, force_new=True, channel=interaction.channel)
 
 
 @bot.tree.command(name="volume", description="Set the playback volume (0-100)")
