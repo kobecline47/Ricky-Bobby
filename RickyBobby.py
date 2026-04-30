@@ -20,6 +20,20 @@ DISBOARD_WEBHOOK_URL = os.getenv('DISBOARD_WEBHOOK_URL')
 LOG_CHANNEL_ID = int(os.getenv('LOG_CHANNEL_ID', 0)) if os.getenv('LOG_CHANNEL_ID') else None
 BUMP_INTERVAL_HOURS = int(os.getenv('BUMP_INTERVAL_HOURS', 2))
 
+# Validate required environment variables
+if not TOKEN:
+    raise ValueError("❌ DISCORD_TOKEN not set in environment variables!")
+if not GUILD_ID or GUILD_ID == 0:
+    raise ValueError("❌ GUILD_ID not set in environment variables!")
+if not DISBOARD_WEBHOOK_URL:
+    raise ValueError("❌ DISBOARD_WEBHOOK_URL not set in environment variables!")
+
+print(f"✅ Configuration loaded:")
+print(f"   Guild ID: {GUILD_ID}")
+print(f"   Bump interval: {BUMP_INTERVAL_HOURS} hours")
+print(f"   Webhook configured: {'Yes' if DISBOARD_WEBHOOK_URL else 'No'}")
+print(f"   Log channel: {LOG_CHANNEL_ID if LOG_CHANNEL_ID else 'Not set'}")
+
 # Intents
 intents = discord.Intents.default()
 intents.message_content = True
@@ -86,21 +100,28 @@ async def on_ready():
     # Load bump data
     load_bump_data()
     
-    # Sync commands with Discord
+    # Sync commands with Discord (guild-scoped)
     try:
-        synced = await bot.tree.sync()
-        print(f"Synced {len(synced)} command(s)")
+        guild = discord.Object(id=GUILD_ID)
+        synced = await bot.tree.sync(guild=guild)
+        print(f"✅ Synced {len(synced)} command(s) to guild {GUILD_ID}")
     except Exception as e:
-        print(f"Failed to sync commands: {e}")
+        print(f"⚠️  Failed to sync commands: {e}")
+        try:
+            synced = await bot.tree.sync()
+            print(f"✅ Synced {len(synced)} command(s) globally (may take up to 1 hour)")
+        except Exception as e2:
+            print(f"❌ Global sync also failed: {e2}")
     
     # Start background tasks
     auto_bump.start()
+    print(f"🚀 Auto-bump task started (every {BUMP_INTERVAL_HOURS} hours)")
     
     # Set bot status
     await bot.change_presence(
         activity=discord.Activity(
             type=discord.ActivityType.watching,
-            name="for bumps every 2 hours"
+            name=f"for bumps every {BUMP_INTERVAL_HOURS} hours"
         )
     )
 
