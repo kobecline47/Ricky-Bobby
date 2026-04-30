@@ -220,6 +220,23 @@ def _gzvibe_playlist_embed(title: str, description: str, color: int = 0x1DB954) 
 
 _load_music_playlists()
 
+MUSIC_COMMAND_CHANNEL_ID = int(os.getenv("MUSIC_COMMAND_CHANNEL_ID", "1496217254533271792"))
+
+
+async def _ensure_music_command_channel(interaction: discord.Interaction) -> bool:
+    if not interaction.guild:
+        await interaction.response.send_message("This command can only be used in a server.", ephemeral=True)
+        return False
+    if interaction.channel_id == MUSIC_COMMAND_CHANNEL_ID:
+        return True
+    if interaction.response.is_done():
+        await interaction.followup.send(
+            f"Use music commands in <#{MUSIC_COMMAND_CHANNEL_ID}>.", ephemeral=True)
+    else:
+        await interaction.response.send_message(
+            f"Use music commands in <#{MUSIC_COMMAND_CHANNEL_ID}>.", ephemeral=True)
+    return False
+
 # ---------------------------------------------------------------------------
 # YouTube helpers
 # ---------------------------------------------------------------------------
@@ -1161,6 +1178,8 @@ class MusicControlView(discord.ui.View):
 
     @discord.ui.button(emoji="⏯️", label="Pause / Resume", style=discord.ButtonStyle.primary, row=0, custom_id="gzv_pause_resume")
     async def pause_resume(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await _ensure_music_command_channel(interaction):
+            return
         vc = interaction.guild.voice_client
         if not vc:
             await interaction.response.send_message("Not connected to voice.", ephemeral=True)
@@ -1176,6 +1195,8 @@ class MusicControlView(discord.ui.View):
 
     @discord.ui.button(emoji="⏭️", label="Skip Track", style=discord.ButtonStyle.secondary, row=0, custom_id="gzv_skip")
     async def skip_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await _ensure_music_command_channel(interaction):
+            return
         vc = interaction.guild.voice_client
         if not vc or (not vc.is_playing() and not vc.is_paused()):
             await interaction.response.send_message("Nothing to skip.", ephemeral=True)
@@ -1185,6 +1206,8 @@ class MusicControlView(discord.ui.View):
 
     @discord.ui.button(emoji="⏹️", label="Stop Session", style=discord.ButtonStyle.danger, row=0, custom_id="gzv_stop")
     async def stop_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await _ensure_music_command_channel(interaction):
+            return
         state = get_music_state(interaction.guild_id)
         vc = interaction.guild.voice_client
         if not vc:
@@ -1203,6 +1226,8 @@ class MusicControlView(discord.ui.View):
 
     @discord.ui.button(emoji="📋", label="Queue Snapshot", style=discord.ButtonStyle.secondary, row=1, custom_id="gzv_queue")
     async def queue_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await _ensure_music_command_channel(interaction):
+            return
         state = get_music_state(interaction.guild_id)
         if not state.current and not state.queue:
             await interaction.response.send_message("The queue is empty.", ephemeral=True)
@@ -1223,6 +1248,8 @@ class MusicControlView(discord.ui.View):
 
     @discord.ui.button(emoji="🔉", label="Vol -10%", style=discord.ButtonStyle.secondary, row=1, custom_id="gzv_vol_down")
     async def vol_down(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await _ensure_music_command_channel(interaction):
+            return
         state = get_music_state(interaction.guild_id)
         state.volume = max(0.0, round(state.volume - 0.1, 2))
         if state.source_transformer:
@@ -1231,6 +1258,8 @@ class MusicControlView(discord.ui.View):
 
     @discord.ui.button(emoji="🔊", label="Vol +10%", style=discord.ButtonStyle.secondary, row=1, custom_id="gzv_vol_up")
     async def vol_up(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await _ensure_music_command_channel(interaction):
+            return
         state = get_music_state(interaction.guild_id)
         state.volume = min(1.0, round(state.volume + 0.1, 2))
         if state.source_transformer:
@@ -1239,6 +1268,8 @@ class MusicControlView(discord.ui.View):
 
     @discord.ui.button(emoji="🔁", label="Autoplay: OFF", style=discord.ButtonStyle.secondary, row=2, custom_id="autoplay_toggle")
     async def autoplay_toggle(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await _ensure_music_command_channel(interaction):
+            return
         state = get_music_state(interaction.guild_id)
         state.autoplay = not state.autoplay
         button.label = f"Autoplay: {'ON' if state.autoplay else 'OFF'}"
@@ -1250,6 +1281,8 @@ class MusicControlView(discord.ui.View):
 
     @discord.ui.button(emoji="🎚️", label="Mode: GzVibe", style=discord.ButtonStyle.success, row=2, custom_id="autoplay_mode_toggle")
     async def autoplay_mode_toggle(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await _ensure_music_command_channel(interaction):
+            return
         state = get_music_state(interaction.guild_id)
         state.autoplay_mode = "balanced" if state.autoplay_mode == "gzvibe" else "gzvibe"
         button.label = f"Mode: {_format_autoplay_mode(state.autoplay_mode)}"
@@ -1259,6 +1292,8 @@ class MusicControlView(discord.ui.View):
 
     @discord.ui.button(emoji="✨", label="Save To Playlist", style=discord.ButtonStyle.primary, row=2, custom_id="playlist_quick_add")
     async def playlist_quick_add(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if not await _ensure_music_command_channel(interaction):
+            return
         state = get_music_state(interaction.guild_id)
         song = state.current or (state.queue[0] if state.queue else None)
         if not song:
@@ -1402,6 +1437,8 @@ async def on_ready():
 @app_commands.autocomplete(query=search_autocomplete)
 @app_commands.describe(query="YouTube URL or search terms")
 async def play(interaction: discord.Interaction, query: str):
+    if not await _ensure_music_command_channel(interaction):
+        return
     member = interaction.guild.get_member(interaction.user.id)
     if not member or not member.voice or not member.voice.channel:
         await interaction.response.send_message("You need to be in a voice channel first.", ephemeral=True)
@@ -1457,6 +1494,8 @@ async def play(interaction: discord.Interaction, query: str):
 
 @bot.tree.command(name="skip", description="Skip the current song")
 async def skip(interaction: discord.Interaction):
+    if not await _ensure_music_command_channel(interaction):
+        return
     vc = interaction.guild.voice_client
     if not vc or not vc.is_playing():
         await interaction.response.send_message("Nothing is playing.", ephemeral=True)
@@ -1467,6 +1506,8 @@ async def skip(interaction: discord.Interaction):
 
 @bot.tree.command(name="pause", description="Pause the current song")
 async def pause(interaction: discord.Interaction):
+    if not await _ensure_music_command_channel(interaction):
+        return
     vc = interaction.guild.voice_client
     if not vc or not vc.is_playing():
         await interaction.response.send_message("Nothing is playing.", ephemeral=True)
@@ -1477,6 +1518,8 @@ async def pause(interaction: discord.Interaction):
 
 @bot.tree.command(name="resume", description="Resume the paused song")
 async def resume(interaction: discord.Interaction):
+    if not await _ensure_music_command_channel(interaction):
+        return
     vc = interaction.guild.voice_client
     if not vc or not vc.is_paused():
         await interaction.response.send_message("Nothing is paused.", ephemeral=True)
@@ -1487,6 +1530,8 @@ async def resume(interaction: discord.Interaction):
 
 @bot.tree.command(name="stop", description="Stop playback and clear the queue")
 async def stop(interaction: discord.Interaction):
+    if not await _ensure_music_command_channel(interaction):
+        return
     state = get_music_state(interaction.guild.id)
     vc = interaction.guild.voice_client
     if not vc:
@@ -1506,6 +1551,8 @@ async def stop(interaction: discord.Interaction):
 
 @bot.tree.command(name="leave", description="Disconnect the bot from voice")
 async def leave(interaction: discord.Interaction):
+    if not await _ensure_music_command_channel(interaction):
+        return
     state = get_music_state(interaction.guild.id)
     vc = interaction.guild.voice_client
     if not vc:
@@ -1525,6 +1572,8 @@ async def leave(interaction: discord.Interaction):
 
 @bot.tree.command(name="queue", description="Show the current music queue")
 async def queue_cmd(interaction: discord.Interaction):
+    if not await _ensure_music_command_channel(interaction):
+        return
     state = get_music_state(interaction.guild.id)
     if not state.current and not state.queue:
         await interaction.response.send_message("The queue is empty.", ephemeral=True)
@@ -1550,6 +1599,8 @@ async def queue_cmd(interaction: discord.Interaction):
 
 @bot.tree.command(name="nowplaying", description="Show what's currently playing")
 async def nowplaying(interaction: discord.Interaction):
+    if not await _ensure_music_command_channel(interaction):
+        return
     state = get_music_state(interaction.guild.id)
     if not state.current:
         await interaction.response.send_message("Nothing is playing.", ephemeral=True)
@@ -1577,6 +1628,8 @@ async def nowplaying(interaction: discord.Interaction):
 @bot.tree.command(name="volume", description="Set the playback volume (0-100)")
 @app_commands.describe(level="Volume level (0-100)")
 async def volume(interaction: discord.Interaction, level: int):
+    if not await _ensure_music_command_channel(interaction):
+        return
     if not 0 <= level <= 100:
         await interaction.response.send_message("Volume must be between 0 and 100.", ephemeral=True)
         return
@@ -1589,6 +1642,8 @@ async def volume(interaction: discord.Interaction, level: int):
 
 @bot.tree.command(name="shuffle", description="Shuffle the queue")
 async def shuffle(interaction: discord.Interaction):
+    if not await _ensure_music_command_channel(interaction):
+        return
     import random
     state = get_music_state(interaction.guild.id)
     if len(state.queue) < 2:
@@ -1603,6 +1658,8 @@ async def shuffle(interaction: discord.Interaction):
 @bot.tree.command(name="remove", description="Remove a song from the queue by position")
 @app_commands.describe(position="Position in queue (1 = next song)")
 async def remove(interaction: discord.Interaction, position: int):
+    if not await _ensure_music_command_channel(interaction):
+        return
     state = get_music_state(interaction.guild.id)
     if position < 1 or position > len(state.queue):
         await interaction.response.send_message(f"Invalid position. Queue has {len(state.queue)} song(s).", ephemeral=True)
@@ -1620,6 +1677,8 @@ async def remove(interaction: discord.Interaction, position: int):
 ])
 @app_commands.describe(mode="GzVibe = tight artist continuity; Balanced = broader discovery")
 async def autoplaymode(interaction: discord.Interaction, mode: str):
+    if not await _ensure_music_command_channel(interaction):
+        return
     state = get_music_state(interaction.guild.id)
     state.autoplay_mode = mode if mode in {"gzvibe", "balanced"} else "gzvibe"
     await interaction.response.send_message(embed=_autoplay_mode_embed(state.autoplay_mode), ephemeral=True)
@@ -1628,6 +1687,8 @@ async def autoplaymode(interaction: discord.Interaction, mode: str):
 
 @bot.tree.command(name="playlist", description="View your GzVibe Favorites playlist")
 async def playlist(interaction: discord.Interaction):
+    if not await _ensure_music_command_channel(interaction):
+        return
     user_playlists = _playlist_bucket(interaction.guild.id, interaction.user.id)
     tracks = user_playlists.get("GzVibe Favorites", [])
     if not tracks:
