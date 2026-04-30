@@ -49,6 +49,7 @@ bump_data = {
     'last_bump': None,
     'bump_count': 0,
     'failed_bumps': 0,
+    'bump_channel_id': None,
 }
 
 # Save file for persistence
@@ -61,11 +62,17 @@ def load_bump_data():
         try:
             with open(BUMP_DATA_FILE, 'r') as f:
                 bump_data = json.load(f)
+            # Backfill keys when loading older save files.
+            bump_data.setdefault('last_bump', None)
+            bump_data.setdefault('bump_count', 0)
+            bump_data.setdefault('failed_bumps', 0)
+            bump_data.setdefault('bump_channel_id', None)
         except:
             bump_data = {
                 'last_bump': None,
                 'bump_count': 0,
                 'failed_bumps': 0,
+                'bump_channel_id': None,
             }
     return bump_data
 
@@ -93,6 +100,14 @@ async def bump_server():
         save_bump_data()
         return False, f"❌ Bump error: {str(e)}"
 
+
+def get_notification_channel() -> discord.abc.Messageable | None:
+    """Resolve where bump notifications should be posted."""
+    channel_id = bump_data.get('bump_channel_id') or LOG_CHANNEL_ID
+    if not channel_id:
+        return None
+    return bot.get_channel(int(channel_id))
+
 @bot.event
 async def on_ready():
     """Bot startup"""
@@ -101,6 +116,7 @@ async def on_ready():
     
     # Load bump data
     load_bump_data()
+    print(f"📍 Bump channel: {bump_data.get('bump_channel_id') or 'Not set'}")
     
     # Sync commands with Discord (guild-scoped)
     try:
@@ -127,6 +143,23 @@ async def on_ready():
         )
     )
 
+
+@bot.event
+async def on_message(message: discord.Message):
+    """If the bot is mentioned in a channel, save that channel for bump notices."""
+    if message.author.bot or not message.guild:
+        return
+
+    if bot.user and bot.user.mentioned_in(message):
+        bump_data['bump_channel_id'] = message.channel.id
+        save_bump_data()
+        await message.channel.send(
+            f"✅ Bump channel set to {message.channel.mention}. "
+            f"I'll post automatic bump updates here every {BUMP_INTERVAL_HOURS} hours."
+        )
+
+    await bot.process_commands(message)
+
 @bot.tree.command(name="bump", description="Manually bump the server to Disboard")
 async def bump_command(interaction: discord.Interaction):
     """Manual bump command"""
@@ -142,20 +175,19 @@ async def bump_command(interaction: discord.Interaction):
     success, message = await bump_server()
     
     # Log the bump
-    if LOG_CHANNEL_ID:
+    notify_channel = get_notification_channel()
+    if notify_channel:
         try:
-            log_channel = bot.get_channel(LOG_CHANNEL_ID)
-            if log_channel:
-                embed = discord.Embed(
-                    title="🚀 Manual Bump Executed",
-                    description=message,
-                    color=discord.Color.green() if success else discord.Color.red(),
-                    timestamp=datetime.now()
-                )
-                embed.add_field(name="Bumped by", value=interaction.user.mention)
-                embed.add_field(name="Total Bumps", value=str(bump_data['bump_count']))
-                embed.add_field(name="Failed Bumps", value=str(bump_data['failed_bumps']))
-                await log_channel.send(embed=embed)
+            embed = discord.Embed(
+                title="🚀 Manual Bump Executed",
+                description=message,
+                color=discord.Color.green() if success else discord.Color.red(),
+                timestamp=datetime.now()
+            )
+            embed.add_field(name="Bumped by", value=interaction.user.mention)
+            embed.add_field(name="Total Bumps", value=str(bump_data['bump_count']))
+            embed.add_field(name="Failed Bumps", value=str(bump_data['failed_bumps']))
+            await notify_channel.send(embed=embed)
         except:
             pass
     
@@ -186,6 +218,26 @@ async def bumpstats_command(interaction: discord.Interaction):
     embed.set_footer(text="Ricky Bobby Bump Bot")
     
     await interaction.followup.send(embed=embed, ephemeral=True)
+
+
+@bot.tree.command(name="setbumpchannel", description="Set the channel for auto bump notifications")
+@app_commands.describe(channel="Channel where Ricky Bobby should post bump updates")
+async def setbumpchannel_command(interaction: discord.Interaction, channel: discord.TextChannel | None = None):
+    """Set or update the bump notification channel."""
+    await interaction.response.defer(ephemeral=True)
+
+    target_channel = channel or interaction.channel
+    if target_channel is None:
+        await interaction.followup.send("❌ Could not determine a channel.", ephemeral=True)
+        return
+
+    bump_data['bump_channel_id'] = target_channel.id
+    save_bump_data()
+
+    await interaction.followup.send(
+        f"✅ Bump channel set to {target_channel.mention}.",
+        ephemeral=True
+    )
 
 @bot.tree.command(name="nextbump", description="Check when the next automatic bump is scheduled")
 async def nextbump_command(interaction: discord.Interaction):
@@ -225,20 +277,19 @@ async def auto_bump():
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}")
     
     # Log the bump
-    if LOG_CHANNEL_ID:
+    notify_channel = get_notification_channel()
+    if notify_channel:
         try:
-            log_channel = bot.get_channel(LOG_CHANNEL_ID)
-            if log_channel:
-                embed = discord.Embed(
-                    title="🚀 Automatic Bump Executed",
-                    description=message,
-                    color=discord.Color.green() if success else discord.Color.red(),
-                    timestamp=datetime.now()
-                )
-                embed.add_field(name="Total Bumps", value=str(bump_data['bump_count']))
-                embed.add_field(name="Failed Bumps", value=str(bump_data['failed_bumps']))
-                embed.add_field(name="Next Bump", value=f"in {BUMP_INTERVAL_HOURS} hours")
-                await log_channel.send(embed=embed)
+            embed = discord.Embed(
+                title="🚀 Automatic Bump Executed",
+                description=message,
+                color=discord.Color.green() if success else discord.Color.red(),
+                timestamp=datetime.now()
+            )
+            embed.add_field(name="Total Bumps", value=str(bump_data['bump_count']))
+            embed.add_field(name="Failed Bumps", value=str(bump_data['failed_bumps']))
+            embed.add_field(name="Next Bump", value=f"in {BUMP_INTERVAL_HOURS} hours")
+            await notify_channel.send(embed=embed)
         except:
             pass
 
