@@ -11,6 +11,7 @@ import os
 import platform as _platform
 import re
 import shutil as _shutil
+import tempfile
 import time
 import traceback
 import urllib.parse
@@ -118,6 +119,7 @@ class SongEntry:
             self.duration = 0
         self.requester = requester
         self.local_path = local_path
+        self.force_local: bool = False
 
     def format_duration(self) -> str:
         m, s = divmod(int(self.duration or 0), 60)
@@ -141,6 +143,7 @@ class GuildMusicState:
         self.autoplay_mode: str = "gzvibe"
         self.last_autoplay_debug: list[dict] = []
         self.retry_attempts: dict[str, int] = {}
+        self.current_started_at: float = 0.0
 
 
 music_states: dict[int, GuildMusicState] = {}
@@ -1092,40 +1095,138 @@ def _ffmpeg_candidate_paths() -> list[str]:
     return deduped
 
 
+def _download_audio_file(song: SongEntry) -> str | None:
+    target = song.webpage_url or song.url
+    if not target:
+        return None
+    try:
+        import yt_dlp
+        cache_dir = os.path.join(tempfile.gettempdir(), "gzvibe_audio_cache")
+        os.makedirs(cache_dir, exist_ok=True)
+        opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "noplaylist": True,
+            "format": "bestaudio[acodec^=opus]/bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio/best",
+            "outtmpl": os.path.join(cache_dir, "%(id)s.%(ext)s"),
+            "socket_timeout": 30,
+            "http_chunk_size": 10485760,
+        }
+        cookiefile = _resolve_yt_cookiefile()
+        if cookiefile:
+            opts["cookiefile"] = cookiefile
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(target, download=True)
+            if not info:
+                return None
+            requested = info.get("requested_downloads") or []
+            if requested and isinstance(requested[0], dict):
+                fp = requested[0].get("filepath")
+                if fp and os.path.exists(fp):
+                    return fp
+            prepared = ydl.prepare_filename(info)
+            if prepared and os.path.exists(prepared):
+                return prepared
+            info_id = info.get("id")
+            if info_id:
+                for name in os.listdir(cache_dir):
+                    if name.startswith(f"{info_id}."):
+                        candidate = os.path.join(cache_dir, name)
+                        if os.path.isfile(candidate):
+                            return candidate
+    except Exception as e:
+        print(f"[Music] local download failed: {e}")
+    return None
+
+
+def _cleanup_local_file(song: SongEntry | None) -> None:
+    if not song or not song.local_path:
+        return
+    try:
+        if os.path.isfile(song.local_path):
+            os.remove(song.local_path)
+    except Exception:
+        pass
+    finally:
+        song.local_path = None
+
+
 async def play_next(guild_id: int, loop: asyncio.AbstractEventLoop):
     state = get_music_state(guild_id)
     if not (state.queue and state.voice_client and state.voice_client.is_connected()):
         _remember_finished_song(state, state.current)
         state.current = None
+        state.current_started_at = 0.0
         return
     state.current = state.queue.popleft()
     song = state.current
     retry_key = _song_identity(song) or (song.webpage_url or song.url or song.title).strip().lower()
     try:
-        try:
-            stream_url = await asyncio.wait_for(
-                loop.run_in_executor(None, lambda: _extract_stream_url(song)), timeout=20.0)
-        except asyncio.TimeoutError:
-            raise RuntimeError("Stream URL resolution timed out")
-        if not stream_url:
-            raise RuntimeError("No playable stream URL could be resolved")
         audio = None
         last_error: Exception | None = None
-        for ffmpeg_exe in _ffmpeg_candidate_paths():
-            if ffmpeg_exe != "ffmpeg" and not os.path.exists(ffmpeg_exe):
-                continue
+
+        if song.force_local and (not song.local_path or not os.path.exists(song.local_path)):
             try:
-                audio = discord.FFmpegPCMAudio(stream_url, executable=ffmpeg_exe,
-                                               before_options=FFMPEG_OPTS["before_options"],
-                                               options=FFMPEG_OPTS["options"])
-                break
-            except Exception as e:
-                last_error = e
+                song.local_path = await asyncio.wait_for(
+                    loop.run_in_executor(None, lambda: _download_audio_file(song)), timeout=90.0)
+            except asyncio.TimeoutError:
+                song.local_path = None
+
+        if song.local_path and os.path.exists(song.local_path):
+            for ffmpeg_exe in _ffmpeg_candidate_paths():
+                if ffmpeg_exe != "ffmpeg" and not os.path.exists(ffmpeg_exe):
+                    continue
+                try:
+                    audio = discord.FFmpegPCMAudio(song.local_path, executable=ffmpeg_exe,
+                                                   options="-vn -sn -dn")
+                    break
+                except Exception as e:
+                    last_error = e
+
+        if audio is None:
+            stream_url = None
+            try:
+                stream_url = await asyncio.wait_for(
+                    loop.run_in_executor(None, lambda: _extract_stream_url(song)), timeout=25.0)
+            except asyncio.TimeoutError:
+                pass
+            if stream_url:
+                for ffmpeg_exe in _ffmpeg_candidate_paths():
+                    if ffmpeg_exe != "ffmpeg" and not os.path.exists(ffmpeg_exe):
+                        continue
+                    try:
+                        audio = discord.FFmpegPCMAudio(stream_url, executable=ffmpeg_exe,
+                                                       before_options=FFMPEG_OPTS["before_options"],
+                                                       options=FFMPEG_OPTS["options"])
+                        break
+                    except Exception as e:
+                        last_error = e
+
+        if audio is None:
+            try:
+                song.local_path = await asyncio.wait_for(
+                    loop.run_in_executor(None, lambda: _download_audio_file(song)), timeout=90.0)
+            except asyncio.TimeoutError:
+                song.local_path = None
+            if song.local_path and os.path.exists(song.local_path):
+                for ffmpeg_exe in _ffmpeg_candidate_paths():
+                    if ffmpeg_exe != "ffmpeg" and not os.path.exists(ffmpeg_exe):
+                        continue
+                    try:
+                        audio = discord.FFmpegPCMAudio(song.local_path, executable=ffmpeg_exe,
+                                                       options="-vn -sn -dn")
+                        break
+                    except Exception as e:
+                        last_error = e
+
         if audio is None:
             raise RuntimeError(f"No working ffmpeg found. Last error: {last_error}")
+
         volume_factor = max(0.1, min(2.0, state.volume))
         source = discord.PCMVolumeTransformer(audio, volume=volume_factor)
         state.source_transformer = source
+        state.current_started_at = time.time()
+        song.force_local = False
 
         def after_play(error):
             try:
@@ -1135,15 +1236,33 @@ async def play_next(guild_id: int, loop: asyncio.AbstractEventLoop):
                     attempts = state.retry_attempts.get(retry_key, 0)
                     if attempts < 1:
                         state.retry_attempts[retry_key] = attempts + 1
+                        song.force_local = True
                         state.queue.appendleft(song)
                         state.current = None
+                        state.current_started_at = 0.0
                         asyncio.run_coroutine_threadsafe(play_next_async(guild_id, loop), loop)
                         return
                 else:
+                    elapsed = max(0.0, time.time() - (state.current_started_at or time.time()))
+                    expected = float(song.duration or 0)
+                    suspicious_cutoff = expected >= 60 and elapsed < min(45.0, expected * 0.5)
+                    if suspicious_cutoff:
+                        attempts = state.retry_attempts.get(retry_key, 0)
+                        print(f"[Music] Early stop detected ({elapsed:.1f}s/{expected:.0f}s): {song.title}")
+                        if attempts < 1:
+                            state.retry_attempts[retry_key] = attempts + 1
+                            song.force_local = True
+                            state.queue.appendleft(song)
+                            state.current = None
+                            state.current_started_at = 0.0
+                            asyncio.run_coroutine_threadsafe(play_next_async(guild_id, loop), loop)
+                            return
                     state.retry_attempts.pop(retry_key, None)
                 finished = state.current
                 _remember_finished_song(state, finished)
+                _cleanup_local_file(finished)
                 state.current = None
+                state.current_started_at = 0.0
                 asyncio.run_coroutine_threadsafe(play_next_async(guild_id, loop), loop)
             except Exception as e:
                 print(f"[Music] after_play error: {e}")
@@ -1152,8 +1271,10 @@ async def play_next(guild_id: int, loop: asyncio.AbstractEventLoop):
         state.voice_client.play(source, after=after_play)
     except Exception as e:
         print(f"[Music] Failed to play {song.title}: {e}")
+        _cleanup_local_file(song)
         _remember_finished_song(state, state.current)
         state.current = None
+        state.current_started_at = 0.0
         asyncio.run_coroutine_threadsafe(play_next_async(guild_id, loop), loop)
 
 
@@ -1484,8 +1605,14 @@ async def play(interaction: discord.Interaction, query: str):
         if not vc.is_playing() and not vc.is_paused():
             _loop = asyncio.get_running_loop()
             await play_next(interaction.guild.id, _loop)
-            await interaction.followup.send(f"▶️ Starting **{entry.title}** — see the player below!", ephemeral=True)
-            await _post_music_panel(interaction.guild.id, force_new=True, channel=interaction.channel)
+            if state.current:
+                await interaction.followup.send(f"▶️ Starting **{entry.title}** — see the player below!", ephemeral=True)
+                await _post_music_panel(interaction.guild.id, force_new=True, channel=interaction.channel)
+            else:
+                await interaction.followup.send(
+                    "I couldn't start that track cleanly. Try another link/query and I will retry with a local fallback.",
+                    ephemeral=True,
+                )
         else:
             embed = discord.Embed(title="Added to Queue",
                                    description=f"[{entry.title}]({entry.webpage_url})", color=0x3498DB)
