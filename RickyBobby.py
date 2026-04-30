@@ -848,6 +848,8 @@ def _fetch_related_yt_dlp(webpage_url: str, exclude_url: str) -> list[dict]:
 
 
 async def search_autocomplete(interaction: discord.Interaction, current: str) -> list[discord.app_commands.Choice[str]]:
+    if interaction.channel_id != MUSIC_COMMAND_CHANNEL_ID:
+        return []
     if not current or len(current) < 2:
         return []
     try:
