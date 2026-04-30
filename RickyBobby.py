@@ -36,8 +36,10 @@ print(f"   Log channel: {LOG_CHANNEL_ID if LOG_CHANNEL_ID else 'Not set'}")
 
 # Intents
 intents = discord.Intents.default()
-intents.message_content = True
-intents.members = True
+# This bot only needs slash commands and scheduled tasks.
+# Keep privileged intents disabled to avoid startup failures.
+intents.message_content = False
+intents.members = False
 
 # Bot setup
 bot = commands.Bot(command_prefix='!', intents=intents)
