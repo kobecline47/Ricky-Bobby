@@ -121,6 +121,7 @@ async def on_ready():
     # Sync commands with Discord (guild-scoped)
     try:
         guild = discord.Object(id=GUILD_ID)
+        bot.tree.copy_global_to(guild=guild)
         synced = await bot.tree.sync(guild=guild)
         print(f"✅ Synced {len(synced)} command(s) to guild {GUILD_ID}")
     except Exception as e:
