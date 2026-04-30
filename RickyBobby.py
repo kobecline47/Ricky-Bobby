@@ -231,7 +231,7 @@ def _gzvibe_playlist_embed(title: str, description: str, color: int = 0x1DB954) 
 _load_music_playlists()
 
 MUSIC_COMMAND_CHANNEL_ID = int(os.getenv("MUSIC_COMMAND_CHANNEL_ID", "1496217254533271792"))
-MUSIC_FORCE_LOCAL_PLAYBACK = os.getenv("MUSIC_FORCE_LOCAL_PLAYBACK", "1").strip() not in {"0", "false", "False", "no", "No"}
+MUSIC_FORCE_LOCAL_PLAYBACK = os.getenv("MUSIC_FORCE_LOCAL_PLAYBACK", "0").strip() not in {"0", "false", "False", "no", "No"}
 
 
 async def _ensure_music_command_channel(interaction: discord.Interaction) -> bool:
@@ -1119,7 +1119,7 @@ def _download_audio_file(song: SongEntry) -> str | None:
             "quiet": True,
             "no_warnings": True,
             "noplaylist": True,
-            "format": "bestaudio[acodec^=opus]/bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio/best",
+            "format": "bestaudio[ext=m4a]/bestaudio[acodec^=opus]/bestaudio[ext=webm]/bestaudio/best",
             "outtmpl": os.path.join(cache_dir, "%(id)s.%(ext)s"),
             "socket_timeout": 30,
             "http_chunk_size": 10485760,
@@ -1194,7 +1194,7 @@ async def play_next(guild_id: int, loop: asyncio.AbstractEventLoop):
                 try:
                     audio = discord.FFmpegPCMAudio(song.local_path, executable=ffmpeg_exe,
                                                    options="-vn -sn -dn")
-                    print(f"[Music] Playback source=local file={song.local_path}")
+                    print(f"[Music] Playback source=local file={song.local_path}", flush=True)
                     break
                 except Exception as e:
                     last_error = e
@@ -1214,7 +1214,7 @@ async def play_next(guild_id: int, loop: asyncio.AbstractEventLoop):
                         audio = discord.FFmpegPCMAudio(stream_url, executable=ffmpeg_exe,
                                                        before_options=FFMPEG_OPTS["before_options"],
                                                        options=FFMPEG_OPTS["options"])
-                        print("[Music] Playback source=stream")
+                        print("[Music] Playback source=stream", flush=True)
                         break
                     except Exception as e:
                         last_error = e
@@ -1232,7 +1232,7 @@ async def play_next(guild_id: int, loop: asyncio.AbstractEventLoop):
                     try:
                         audio = discord.FFmpegPCMAudio(song.local_path, executable=ffmpeg_exe,
                                                        options="-vn -sn -dn")
-                        print(f"[Music] Playback source=local-fallback file={song.local_path}")
+                        print(f"[Music] Playback source=local-fallback file={song.local_path}", flush=True)
                         break
                     except Exception as e:
                         last_error = e
@@ -1250,9 +1250,9 @@ async def play_next(guild_id: int, loop: asyncio.AbstractEventLoop):
             try:
                 state.source_transformer = None
                 if error:
-                    print(f"[Music] Player error: {error}")
+                    print(f"[Music] Player error: {error}", flush=True)
                     attempts = state.retry_attempts.get(retry_key, 0)
-                    if attempts < 1:
+                    if attempts < 2:
                         state.retry_attempts[retry_key] = attempts + 1
                         song.force_local = True
                         state.queue.appendleft(song)
@@ -1263,12 +1263,12 @@ async def play_next(guild_id: int, loop: asyncio.AbstractEventLoop):
                 else:
                     elapsed = max(0.0, time.time() - (state.current_started_at or time.time()))
                     expected = float(song.duration or 0)
-                    print(f"[Music] Track finished elapsed={elapsed:.1f}s expected={expected:.0f}s title={song.title}")
+                    print(f"[Music] Track finished elapsed={elapsed:.1f}s expected={expected:.0f}s title={song.title}", flush=True)
                     suspicious_cutoff = expected >= 60 and elapsed < min(45.0, expected * 0.5)
                     if suspicious_cutoff:
                         attempts = state.retry_attempts.get(retry_key, 0)
-                        print(f"[Music] Early stop detected ({elapsed:.1f}s/{expected:.0f}s): {song.title}")
-                        if attempts < 1:
+                        print(f"[Music] Early stop detected ({elapsed:.1f}s/{expected:.0f}s): {song.title}", flush=True)
+                        if attempts < 2:
                             state.retry_attempts[retry_key] = attempts + 1
                             song.force_local = True
                             state.queue.appendleft(song)
@@ -1289,7 +1289,7 @@ async def play_next(guild_id: int, loop: asyncio.AbstractEventLoop):
         print(f"[Music] Now playing: {song.title}")
         state.voice_client.play(source, after=after_play)
     except Exception as e:
-        print(f"[Music] Failed to play {song.title}: {e}")
+        print(f"[Music] Failed to play {song.title}: {e}", flush=True)
         _cleanup_local_file(song)
         _remember_finished_song(state, state.current)
         state.current = None
