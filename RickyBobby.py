@@ -132,6 +132,7 @@ class GuildMusicState:
         self.queue: collections.deque[SongEntry] = collections.deque()
         self.current: SongEntry | None = None
         self.last_finished: SongEntry | None = None
+        self.previous_finished: SongEntry | None = None
         self.recent_track_ids: collections.deque[str] = collections.deque(maxlen=20)
         self.recent_title_keys: collections.deque[str] = collections.deque(maxlen=20)
         self.recent_artist_keys: collections.deque[str] = collections.deque(maxlen=12)
@@ -144,6 +145,7 @@ class GuildMusicState:
         self.last_autoplay_debug: list[dict] = []
         self.retry_attempts: dict[str, int] = {}
         self.current_started_at: float = 0.0
+        self.autoplay_use_previous_seed_once: bool = False
 
 
 music_states: dict[int, GuildMusicState] = {}
@@ -418,6 +420,7 @@ def _entry_identity(entry: dict) -> str:
 def _remember_finished_song(state: GuildMusicState, song: SongEntry | None) -> None:
     if not song:
         return
+    state.previous_finished = state.last_finished
     state.last_finished = song
     sid = _song_identity(song)
     if sid:
@@ -924,9 +927,18 @@ async def _rank_autoplay_candidates(state: GuildMusicState, current: SongEntry) 
         if rid and rid in blocked_ids:
             return False
         rtitle = entry.get("title", "")
+        rartist = _entry_artist_key(entry)
+        if state.autoplay_mode == "gzvibe" and current_artist_key and rartist and rartist != current_artist_key:
+            return False
         rkey = _song_core_key(rtitle)
         if rkey and any(_same_song_key(rkey, bk) for bk in blocked_title_keys):
             return False
+        if rkey and current_title_key and _same_song_key(rkey, current_title_key):
+            noisy_variant = any(term in rtitle.lower() for term in [
+                "radio edit", "radio version", "version", "remix", "edit", "slowed", "reverb", "nightcore",
+            ])
+            if noisy_variant:
+                return False
         if _titles_too_similar(current.title, rtitle):
             return False
         if any(_titles_too_similar(s, rtitle) for s in recent_seed_titles if s):
@@ -1301,6 +1313,10 @@ async def play_next(guild_id: int, loop: asyncio.AbstractEventLoop):
 async def play_next_async(guild_id: int, loop: asyncio.AbstractEventLoop):
     state = get_music_state(guild_id)
     seed_song = state.current or state.last_finished
+    if state.autoplay_use_previous_seed_once:
+        state.autoplay_use_previous_seed_once = False
+        if state.previous_finished:
+            seed_song = state.previous_finished
     if not state.queue and state.autoplay and seed_song:
         try:
             r = await fetch_related_song(state, seed_song)
@@ -1646,10 +1662,13 @@ async def play(interaction: discord.Interaction, query: str):
 async def skip(interaction: discord.Interaction):
     if not await _ensure_music_command_channel(interaction):
         return
+    state = get_music_state(interaction.guild.id)
     vc = interaction.guild.voice_client
     if not vc or not vc.is_playing():
         await interaction.response.send_message("Nothing is playing.", ephemeral=True)
         return
+    if state.autoplay:
+        state.autoplay_use_previous_seed_once = True
     vc.stop()
     await interaction.response.send_message("⏭️ Skipped.")
 
