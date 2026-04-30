@@ -6,6 +6,7 @@ Automatically bumps the server to Disboard every 2 hours
 import os
 import discord
 from discord.ext import commands, tasks
+from discord import app_commands
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
 import aiohttp
@@ -36,6 +37,9 @@ bump_data = {
 
 # Save file for persistence
 BUMP_DATA_FILE = 'bump_data.json'
+
+# Command tree for slash commands
+bot.tree = app_commands.CommandTree(bot)
 
 def load_bump_data():
     """Load bump data from file"""
@@ -85,6 +89,13 @@ async def on_ready():
     # Load bump data
     load_bump_data()
     
+    # Sync commands with Discord
+    try:
+        synced = await bot.tree.sync()
+        print(f"Synced {len(synced)} command(s)")
+    except Exception as e:
+        print(f"Failed to sync commands: {e}")
+    
     # Start background tasks
     auto_bump.start()
     
@@ -96,7 +107,7 @@ async def on_ready():
         )
     )
 
-@bot.slash_command(name="bump", description="Manually bump the server to Disboard")
+@bot.tree.command(name="bump", description="Manually bump the server to Disboard")
 async def bump_command(interaction: discord.Interaction):
     """Manual bump command"""
     await interaction.response.defer(ephemeral=True)
@@ -130,7 +141,7 @@ async def bump_command(interaction: discord.Interaction):
     
     await interaction.followup.send(message, ephemeral=True)
 
-@bot.slash_command(name="bumpstats", description="View bump statistics")
+@bot.tree.command(name="bumpstats", description="View bump statistics")
 async def bumpstats_command(interaction: discord.Interaction):
     """Show bump statistics"""
     await interaction.response.defer(ephemeral=True)
@@ -156,7 +167,7 @@ async def bumpstats_command(interaction: discord.Interaction):
     
     await interaction.followup.send(embed=embed, ephemeral=True)
 
-@bot.slash_command(name="nextbump", description="Check when the next automatic bump is scheduled")
+@bot.tree.command(name="nextbump", description="Check when the next automatic bump is scheduled")
 async def nextbump_command(interaction: discord.Interaction):
     """Show next scheduled bump time"""
     await interaction.response.defer(ephemeral=True)
