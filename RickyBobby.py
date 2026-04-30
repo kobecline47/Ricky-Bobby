@@ -19,26 +19,23 @@ GUILD_ID = int(os.getenv('GUILD_ID', 0))
 DISBOARD_WEBHOOK_URL = os.getenv('DISBOARD_WEBHOOK_URL')
 LOG_CHANNEL_ID = int(os.getenv('LOG_CHANNEL_ID', 0)) if os.getenv('LOG_CHANNEL_ID') else None
 BUMP_INTERVAL_HOURS = int(os.getenv('BUMP_INTERVAL_HOURS', 2))
+DISBOARD_BOT_ID = int(os.getenv('DISBOARD_BOT_ID', 302050872383242240))
 
 # Validate required environment variables
 if not TOKEN:
     raise ValueError("❌ DISCORD_TOKEN not set in environment variables!")
 if not GUILD_ID or GUILD_ID == 0:
     raise ValueError("❌ GUILD_ID not set in environment variables!")
-if not DISBOARD_WEBHOOK_URL:
-    raise ValueError("❌ DISBOARD_WEBHOOK_URL not set in environment variables!")
-
 print(f"✅ Configuration loaded:")
 print(f"   Guild ID: {GUILD_ID}")
 print(f"   Bump interval: {BUMP_INTERVAL_HOURS} hours")
-print(f"   Webhook configured: {'Yes' if DISBOARD_WEBHOOK_URL else 'No'}")
+print(f"   Disboard bot id: {DISBOARD_BOT_ID}")
 print(f"   Log channel: {LOG_CHANNEL_ID if LOG_CHANNEL_ID else 'Not set'}")
 
 # Intents
 intents = discord.Intents.default()
-# This bot only needs slash commands and scheduled tasks.
-# Keep privileged intents disabled to avoid startup failures.
-intents.message_content = False
+# We need message content to read Disboard confirmation messages.
+intents.message_content = True
 intents.members = False
 
 # Bot setup
@@ -94,23 +91,8 @@ def save_bump_data():
         json.dump(bump_data, f, indent=2)
 
 async def bump_server():
-    """Execute a bump to Disboard"""
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(DISBOARD_WEBHOOK_URL) as resp:
-                if resp.status == 200:
-                    bump_data['last_bump'] = datetime.now().isoformat()
-                    bump_data['bump_count'] += 1
-                    save_bump_data()
-                    return True, "✅ Server bumped successfully!"
-                else:
-                    bump_data['failed_bumps'] += 1
-                    save_bump_data()
-                    return False, f"❌ Bump failed with status {resp.status}"
-    except Exception as e:
-        bump_data['failed_bumps'] += 1
-        save_bump_data()
-        return False, f"❌ Bump error: {str(e)}"
+    """Disboard bump cannot be executed by a bot; send instructions instead."""
+    return True, "Run Disboard /bump now in this channel. I will track the confirmation and schedule reminders."
 
 
 def get_notification_channel() -> discord.abc.Messageable | None:
@@ -175,23 +157,36 @@ async def on_message(message: discord.Message):
         save_bump_data()
         await message.channel.send(
             f"✅ Bump channel set to {message.channel.mention}. "
-            f"I'll post automatic bump updates here every {BUMP_INTERVAL_HOURS} hours."
+            f"I'll post Disboard /bump reminders here every {BUMP_INTERVAL_HOURS} hours."
         )
+
+    # Track confirmed bumps from Disboard's bot response.
+    if message.author.id == DISBOARD_BOT_ID:
+        content = (message.content or "").lower()
+        embed_text = ""
+        if message.embeds:
+            parts = []
+            for emb in message.embeds:
+                if emb.title:
+                    parts.append(emb.title)
+                if emb.description:
+                    parts.append(emb.description)
+            embed_text = " ".join(parts).lower()
+
+        if "bump done" in content or "bump done" in embed_text or "please wait another" in content:
+            bump_data['last_bump'] = datetime.now().isoformat()
+            bump_data['bump_count'] += 1
+            save_bump_data()
+            await message.channel.send(
+                f"✅ Bump confirmed. I will remind this channel again in {BUMP_INTERVAL_HOURS} hours."
+            )
 
     await bot.process_commands(message)
 
 @bot.tree.command(name="bump", description="Manually bump the server to Disboard")
 async def bump_command(interaction: discord.Interaction):
-    """Manual bump command"""
+    """Manual helper command for Disboard bumping"""
     await interaction.response.defer(ephemeral=True)
-    
-    if not DISBOARD_WEBHOOK_URL:
-        await interaction.followup.send(
-            "❌ Disboard webhook not configured. Ask admin to set DISBOARD_WEBHOOK_URL.",
-            ephemeral=True
-        )
-        return
-    
     success, message = await bump_server()
     
     # Log the bump
@@ -199,19 +194,22 @@ async def bump_command(interaction: discord.Interaction):
     if notify_channel:
         try:
             embed = discord.Embed(
-                title="🚀 Manual Bump Executed",
+                title="🚀 Disboard Bump Reminder",
                 description=message,
                 color=discord.Color.green() if success else discord.Color.red(),
                 timestamp=datetime.now()
             )
-            embed.add_field(name="Bumped by", value=interaction.user.mention)
+            embed.add_field(name="Requested by", value=interaction.user.mention)
             embed.add_field(name="Total Bumps", value=str(bump_data['bump_count']))
             embed.add_field(name="Failed Bumps", value=str(bump_data['failed_bumps']))
             await notify_channel.send(embed=embed)
         except:
             pass
     
-    await interaction.followup.send(message, ephemeral=True)
+    await interaction.followup.send(
+        "Use Disboard's /bump command now. I will detect the confirmation and track it automatically.",
+        ephemeral=True
+    )
 
 @bot.tree.command(name="bumpstats", description="View bump statistics")
 async def bumpstats_command(interaction: discord.Interaction):
@@ -287,23 +285,17 @@ async def nextbump_command(interaction: discord.Interaction):
 
 @tasks.loop(hours=BUMP_INTERVAL_HOURS)
 async def auto_bump():
-    """Automatic bump task that runs every N hours"""
-    if not DISBOARD_WEBHOOK_URL:
-        print("⚠️  Disboard webhook not configured, skipping auto-bump")
-        return
-    
-    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Running automatic bump...")
-    success, message = await bump_server()
-    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}")
+    """Automatic reminder task that runs every N hours"""
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Running automatic bump reminder...")
     
     # Log the bump
     notify_channel = get_notification_channel()
     if notify_channel:
         try:
             embed = discord.Embed(
-                title="🚀 Automatic Bump Executed",
-                description=message,
-                color=discord.Color.green() if success else discord.Color.red(),
+                title="⏰ Time To Bump On Disboard",
+                description="Run Disboard's /bump command in this channel now.",
+                color=discord.Color.blurple(),
                 timestamp=datetime.now()
             )
             embed.add_field(name="Total Bumps", value=str(bump_data['bump_count']))
