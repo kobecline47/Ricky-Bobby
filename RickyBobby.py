@@ -38,9 +38,6 @@ bump_data = {
 # Save file for persistence
 BUMP_DATA_FILE = 'bump_data.json'
 
-# Command tree for slash commands
-bot.tree = app_commands.CommandTree(bot)
-
 def load_bump_data():
     """Load bump data from file"""
     global bump_data
