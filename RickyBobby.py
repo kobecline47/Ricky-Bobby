@@ -82,16 +82,23 @@ print(f"[Music] Using FFmpeg: {FFMPEG_EXE}")
 
 FFMPEG_OPTS = {
     "executable": FFMPEG_EXE,
-    "before_options": "-nostdin -reconnect 1 -reconnect_streamed 1 -reconnect_at_eof 1 -reconnect_delay_max 10 -rw_timeout 15000000",
-    "options": "-vn -sn -dn -bufsize 256k",
+    "before_options": (
+        "-nostdin "
+        "-reconnect 1 -reconnect_streamed 1 -reconnect_at_eof 1 "
+        "-reconnect_on_network_error 1 -reconnect_on_http_error 4xx,5xx "
+        "-reconnect_delay_max 30 -rw_timeout 60000000"
+    ),
+    "options": "-vn -sn -dn -bufsize 512k",
 }
 
 YTDL_STREAM_OPTS = {
     "quiet": True,
     "no_warnings": True,
     "noplaylist": True,
-    "format": "bestaudio[ext=m4a]/bestaudio/best",
+    "format": "bestaudio[acodec^=opus]/bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio/best",
     "source_address": "0.0.0.0",
+    "socket_timeout": 30,
+    "http_chunk_size": 10485760,
     "extractor_args": {"youtube": {"player_client": ["android", "web", "tv_embedded"]}},
 }
 
