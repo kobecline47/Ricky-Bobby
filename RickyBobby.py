@@ -231,6 +231,7 @@ def _gzvibe_playlist_embed(title: str, description: str, color: int = 0x1DB954) 
 _load_music_playlists()
 
 MUSIC_COMMAND_CHANNEL_ID = int(os.getenv("MUSIC_COMMAND_CHANNEL_ID", "1496217254533271792"))
+MUSIC_FORCE_LOCAL_PLAYBACK = os.getenv("MUSIC_FORCE_LOCAL_PLAYBACK", "1").strip() not in {"0", "false", "False", "no", "No"}
 
 
 async def _ensure_music_command_channel(interaction: discord.Interaction) -> bool:
@@ -246,6 +247,17 @@ async def _ensure_music_command_channel(interaction: discord.Interaction) -> boo
         await interaction.response.send_message(
             f"Use music commands in <#{MUSIC_COMMAND_CHANNEL_ID}>.", ephemeral=True)
     return False
+
+
+def _resolve_music_panel_channel(guild: discord.Guild) -> discord.TextChannel | None:
+    by_id = guild.get_channel(MUSIC_COMMAND_CHANNEL_ID)
+    if isinstance(by_id, discord.TextChannel):
+        return by_id
+    for name in ("🎵┃𝖬𝗎𝗌𝗂𝖼-𝖢𝗈𝗆𝗆𝖺𝗇𝖽𝗌", "🎵┃music-commands", "music-commands", "music"):
+        ch = discord.utils.get(guild.text_channels, name=name)
+        if ch:
+            return ch
+    return guild.text_channels[0] if guild.text_channels else None
 
 # ---------------------------------------------------------------------------
 # YouTube helpers
@@ -1165,6 +1177,9 @@ async def play_next(guild_id: int, loop: asyncio.AbstractEventLoop):
         audio = None
         last_error: Exception | None = None
 
+        if MUSIC_FORCE_LOCAL_PLAYBACK:
+            song.force_local = True
+
         if song.force_local and (not song.local_path or not os.path.exists(song.local_path)):
             try:
                 song.local_path = await asyncio.wait_for(
@@ -1179,6 +1194,7 @@ async def play_next(guild_id: int, loop: asyncio.AbstractEventLoop):
                 try:
                     audio = discord.FFmpegPCMAudio(song.local_path, executable=ffmpeg_exe,
                                                    options="-vn -sn -dn")
+                    print(f"[Music] Playback source=local file={song.local_path}")
                     break
                 except Exception as e:
                     last_error = e
@@ -1198,6 +1214,7 @@ async def play_next(guild_id: int, loop: asyncio.AbstractEventLoop):
                         audio = discord.FFmpegPCMAudio(stream_url, executable=ffmpeg_exe,
                                                        before_options=FFMPEG_OPTS["before_options"],
                                                        options=FFMPEG_OPTS["options"])
+                        print("[Music] Playback source=stream")
                         break
                     except Exception as e:
                         last_error = e
@@ -1215,6 +1232,7 @@ async def play_next(guild_id: int, loop: asyncio.AbstractEventLoop):
                     try:
                         audio = discord.FFmpegPCMAudio(song.local_path, executable=ffmpeg_exe,
                                                        options="-vn -sn -dn")
+                        print(f"[Music] Playback source=local-fallback file={song.local_path}")
                         break
                     except Exception as e:
                         last_error = e
@@ -1245,6 +1263,7 @@ async def play_next(guild_id: int, loop: asyncio.AbstractEventLoop):
                 else:
                     elapsed = max(0.0, time.time() - (state.current_started_at or time.time()))
                     expected = float(song.duration or 0)
+                    print(f"[Music] Track finished elapsed={elapsed:.1f}s expected={expected:.0f}s title={song.title}")
                     suspicious_cutoff = expected >= 60 and elapsed < min(45.0, expected * 0.5)
                     if suspicious_cutoff:
                         attempts = state.retry_attempts.get(retry_key, 0)
@@ -1452,15 +1471,7 @@ async def _post_music_panel(guild_id: int, force_new: bool = False,
     guild = bot.get_guild(guild_id)
     if not guild or not state.current:
         return
-    music_ch = channel
-    if not music_ch:
-        for name in ("🎵┃music-commands", "music-commands", "music"):
-            music_ch = discord.utils.get(guild.text_channels, name=name)
-            if music_ch:
-                break
-    if not music_ch:
-        if guild.text_channels:
-            music_ch = guild.text_channels[0]
+    music_ch = channel or _resolve_music_panel_channel(guild)
     if not music_ch:
         return
 
