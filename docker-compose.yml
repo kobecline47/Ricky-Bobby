@@ -1,0 +1,10 @@
+version: '3.8'
+
+services:
+  rickyb bobby:
+    build: .
+    container_name: rickyb bobby-bot
+    env_file: .env
+    restart: always
+    volumes:
+      - ./bump_data.json:/app/bump_data.json
