@@ -928,8 +928,21 @@ async def _rank_autoplay_candidates(state: GuildMusicState, current: SongEntry) 
             return False
         rtitle = entry.get("title", "")
         rartist = _entry_artist_key(entry)
-        if state.autoplay_mode == "gzvibe" and current_artist_key and rartist and rartist != current_artist_key:
+        lowered_title = rtitle.lower()
+        banned_terms = [
+            "grand prize", "winner", "giveaway", "contest", "reaction", "prank", "trailer",
+            "full movie", "interview", "podcast", "episode", "highlights", "gameplay",
+        ]
+        if any(term in lowered_title for term in banned_terms):
             return False
+        if state.autoplay_mode == "gzvibe" and current_artist_key:
+            if rartist:
+                if rartist != current_artist_key:
+                    return False
+            else:
+                artist_tokens = [t for t in current_artist_key.split() if len(t) >= 3]
+                if artist_tokens and not any(tok in lowered_title for tok in artist_tokens):
+                    return False
         rkey = _song_core_key(rtitle)
         if rkey and any(_same_song_key(rkey, bk) for bk in blocked_title_keys):
             return False
