@@ -42,7 +42,19 @@ intents.message_content = False
 intents.members = False
 
 # Bot setup
-bot = commands.Bot(command_prefix='!', intents=intents)
+class RickyBobbyBot(commands.Bot):
+    async def setup_hook(self):
+        """Sync slash commands early so they appear quickly in the target guild."""
+        try:
+            guild = discord.Object(id=GUILD_ID)
+            self.tree.copy_global_to(guild=guild)
+            synced = await self.tree.sync(guild=guild)
+            print(f"✅ setup_hook: synced {len(synced)} command(s) to guild {GUILD_ID}", flush=True)
+        except Exception as e:
+            print(f"❌ setup_hook sync failed: {e}", flush=True)
+
+
+bot = RickyBobbyBot(command_prefix='!', intents=intents)
 
 # Bump tracking
 bump_data = {
@@ -111,30 +123,37 @@ def get_notification_channel() -> discord.abc.Messageable | None:
 @bot.event
 async def on_ready():
     """Bot startup"""
-    print(f"✅ {bot.user} is online!")
-    print(f"Logged in as {bot.user.name}#{bot.user.discriminator}")
+    print(f"✅ {bot.user} is online!", flush=True)
+    print(f"Logged in as {bot.user} (id={bot.user.id})", flush=True)
+    print(
+        "Guilds visible: "
+        + ", ".join([f"{g.name}({g.id})" for g in bot.guilds])
+        if bot.guilds
+        else "Guilds visible: none",
+        flush=True,
+    )
     
     # Load bump data
     load_bump_data()
-    print(f"📍 Bump channel: {bump_data.get('bump_channel_id') or 'Not set'}")
+    print(f"📍 Bump channel: {bump_data.get('bump_channel_id') or 'Not set'}", flush=True)
     
     # Sync commands with Discord (guild-scoped)
     try:
         guild = discord.Object(id=GUILD_ID)
         bot.tree.copy_global_to(guild=guild)
         synced = await bot.tree.sync(guild=guild)
-        print(f"✅ Synced {len(synced)} command(s) to guild {GUILD_ID}")
+        print(f"✅ on_ready: synced {len(synced)} command(s) to guild {GUILD_ID}", flush=True)
     except Exception as e:
-        print(f"⚠️  Failed to sync commands: {e}")
+        print(f"⚠️  on_ready sync failed: {e}", flush=True)
         try:
             synced = await bot.tree.sync()
-            print(f"✅ Synced {len(synced)} command(s) globally (may take up to 1 hour)")
+            print(f"✅ on_ready: synced {len(synced)} command(s) globally (may take up to 1 hour)", flush=True)
         except Exception as e2:
-            print(f"❌ Global sync also failed: {e2}")
+            print(f"❌ Global sync also failed: {e2}", flush=True)
     
     # Start background tasks
     auto_bump.start()
-    print(f"🚀 Auto-bump task started (every {BUMP_INTERVAL_HOURS} hours)")
+    print(f"🚀 Auto-bump task started (every {BUMP_INTERVAL_HOURS} hours)", flush=True)
     
     # Set bot status
     await bot.change_presence(
