@@ -1118,6 +1118,7 @@ def _download_audio_file(song: SongEntry) -> str | None:
         opts = {
             "quiet": True,
             "no_warnings": True,
+            "noprogress": True,
             "noplaylist": True,
             "format": "bestaudio[ext=m4a]/bestaudio[acodec^=opus]/bestaudio[ext=webm]/bestaudio/best",
             "outtmpl": os.path.join(cache_dir, "%(id)s.%(ext)s"),
@@ -1304,9 +1305,11 @@ async def play_next_async(guild_id: int, loop: asyncio.AbstractEventLoop):
         try:
             r = await fetch_related_song(state, seed_song)
             if r:
-                state.queue.append(SongEntry(
+                auto_entry = SongEntry(
                     title=r["title"], url=r["url"], webpage_url=r["webpage_url"],
-                    duration=r.get("duration") or 0, requester=seed_song.requester))
+                    duration=r.get("duration") or 0, requester=seed_song.requester)
+                auto_entry.force_local = True
+                state.queue.append(auto_entry)
         except Exception as e:
             print(f"[Autoplay] Failed: {e}")
     _loop = asyncio.get_running_loop()
