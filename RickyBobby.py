@@ -233,7 +233,7 @@ def _gzvibe_playlist_embed(title: str, description: str, color: int = 0x1DB954) 
 _load_music_playlists()
 
 MUSIC_COMMAND_CHANNEL_ID = int(os.getenv("MUSIC_COMMAND_CHANNEL_ID", "1496217254533271792"))
-MUSIC_FORCE_LOCAL_PLAYBACK = os.getenv("MUSIC_FORCE_LOCAL_PLAYBACK", "0").strip() not in {"0", "false", "False", "no", "No"}
+MUSIC_FORCE_LOCAL_PLAYBACK = os.getenv("MUSIC_FORCE_LOCAL_PLAYBACK", "1").strip() not in {"0", "false", "False", "no", "No"}
 
 
 async def _ensure_music_command_channel(interaction: discord.Interaction) -> bool:
@@ -1140,6 +1140,13 @@ def _download_audio_file(song: SongEntry) -> str | None:
         import yt_dlp
         cache_dir = os.path.join(tempfile.gettempdir(), "gzvibe_audio_cache")
         os.makedirs(cache_dir, exist_ok=True)
+        vid = _youtube_video_id(target)
+        if vid:
+            for name in os.listdir(cache_dir):
+                if name.startswith(f"{vid}."):
+                    candidate = os.path.join(cache_dir, name)
+                    if os.path.isfile(candidate) and os.path.getsize(candidate) > 256 * 1024:
+                        return candidate
         opts = {
             "quiet": True,
             "no_warnings": True,
@@ -1149,6 +1156,8 @@ def _download_audio_file(song: SongEntry) -> str | None:
             "outtmpl": os.path.join(cache_dir, "%(id)s.%(ext)s"),
             "socket_timeout": 30,
             "http_chunk_size": 10485760,
+            "retries": 10,
+            "fragment_retries": 10,
         }
         cookiefile = _resolve_yt_cookiefile()
         if cookiefile:
