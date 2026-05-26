@@ -1,0 +1,2335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ricky Bobby Ops Dashboard</title>
+    <style>
+        :root {
+            --bg: #09121b;
+            --bg-elevated: rgba(13, 24, 36, 0.92);
+            --panel: rgba(15, 28, 41, 0.9);
+            --panel-strong: rgba(19, 35, 49, 0.98);
+            --line: rgba(119, 163, 196, 0.22);
+            --text: #e8f0f6;
+            --muted: #9cb1c2;
+            --accent: #4fd1c5;
+            --accent-strong: #1d9bf0;
+            --accent-warm: #ffb454;
+            --success: #2fbf71;
+            --danger: #ff6b6b;
+            --shadow: 0 24px 60px rgba(0, 0, 0, 0.33);
+            --radius: 22px;
+            --radius-sm: 14px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            color: var(--text);
+            font-family: "Aptos", "Trebuchet MS", "Segoe UI", sans-serif;
+            background:
+                radial-gradient(circle at top left, rgba(79, 209, 197, 0.18), transparent 28%),
+                radial-gradient(circle at top right, rgba(29, 155, 240, 0.20), transparent 30%),
+                linear-gradient(160deg, #081019 0%, #0b1621 36%, #111c28 100%);
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 32px 32px;
+            -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.55), transparent 92%);
+            mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.55), transparent 92%);
+        }
+
+        a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        button,
+        input,
+        select,
+        textarea {
+            font: inherit;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 290px minmax(0, 1fr);
+            gap: 28px;
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 28px;
+            position: relative;
+        }
+
+        .sidebar {
+            position: sticky;
+            top: 28px;
+            align-self: start;
+            padding: 26px 22px;
+            border-radius: 28px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--line);
+            box-shadow: var(--shadow);
+            -webkit-backdrop-filter: blur(18px);
+            backdrop-filter: blur(18px);
+        }
+
+        .brand-row {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .brand-badge {
+            width: 52px;
+            height: 52px;
+            display: grid;
+            place-items: center;
+            border-radius: 16px;
+            font-size: 1.6rem;
+            background: linear-gradient(145deg, rgba(79, 209, 197, 0.2), rgba(29, 155, 240, 0.22));
+            border: 1px solid rgba(79, 209, 197, 0.4);
+        }
+
+        .brand-copy h1 {
+            margin: 0;
+            font-size: 1.1rem;
+            letter-spacing: 0.02em;
+        }
+
+        .brand-copy p {
+            margin: 4px 0 0;
+            color: var(--muted);
+            font-size: 0.88rem;
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            border-radius: 999px;
+            border: 1px solid rgba(79, 209, 197, 0.24);
+            color: #cffbf4;
+            background: rgba(79, 209, 197, 0.12);
+            font-size: 0.82rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 999px;
+            background: var(--success);
+            box-shadow: 0 0 14px rgba(47, 191, 113, 0.55);
+        }
+
+        .nav-label {
+            margin: 28px 0 10px;
+            color: var(--muted);
+            font-size: 0.77rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .section-nav {
+            display: grid;
+            gap: 8px;
+        }
+
+        .section-link {
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 14px;
+            border-radius: 16px;
+            color: var(--muted);
+            transition: 160ms ease;
+        }
+
+        .section-link:hover,
+        .section-link.active {
+            color: var(--text);
+            background: rgba(255, 255, 255, 0.06);
+            border-color: rgba(255, 255, 255, 0.09);
+        }
+
+        .section-link strong {
+            font-size: 0.95rem;
+        }
+
+        .section-link small {
+            color: var(--muted);
+            display: block;
+            margin-top: 2px;
+        }
+
+        .section-count {
+            min-width: 30px;
+            padding: 5px 8px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.06);
+            text-align: center;
+            font-size: 0.78rem;
+            color: var(--text);
+        }
+
+        .sidebar-actions {
+            margin-top: 26px;
+            display: grid;
+            gap: 10px;
+        }
+
+        .sidebar-actions a,
+        .sidebar-actions button,
+        .toolbar button,
+        .form-actions button,
+        .chip-button,
+        .table-button {
+            appearance: none;
+            border: 0;
+            border-radius: 14px;
+            padding: 12px 14px;
+            color: white;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-strong), var(--accent));
+            cursor: pointer;
+            transition: transform 140ms ease, opacity 140ms ease, box-shadow 140ms ease;
+            box-shadow: 0 12px 28px rgba(29, 155, 240, 0.22);
+        }
+
+        .sidebar-actions a:last-child,
+        .toolbar button.secondary,
+        .form-actions button.secondary,
+        .table-button.secondary,
+        .chip-button.secondary {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text);
+            box-shadow: none;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        button:hover,
+        .sidebar-actions a:hover {
+            transform: translateY(-1px);
+        }
+
+        .main {
+            display: grid;
+            gap: 24px;
+        }
+
+        .hero {
+            position: relative;
+            overflow: hidden;
+            padding: 28px;
+            border-radius: 32px;
+            background:
+                linear-gradient(145deg, rgba(255, 180, 84, 0.12), transparent 40%),
+                linear-gradient(135deg, rgba(79, 209, 197, 0.16), rgba(29, 155, 240, 0.18)),
+                rgba(14, 28, 40, 0.92);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: var(--shadow);
+        }
+
+        .hero::after {
+            content: "";
+            position: absolute;
+            inset: auto -80px -100px auto;
+            width: 240px;
+            height: 240px;
+            border-radius: 999px;
+            background: radial-gradient(circle, rgba(255, 180, 84, 0.28), transparent 70%);
+            filter: blur(6px);
+        }
+
+        .hero-top {
+            display: flex;
+            justify-content: space-between;
+            gap: 18px;
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #d9fbf7;
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .hero h2 {
+            margin: 14px 0 10px;
+            font-size: clamp(1.9rem, 2vw + 1rem, 3rem);
+            line-height: 1.05;
+            max-width: 10ch;
+        }
+
+        .hero p {
+            margin: 0;
+            max-width: 60ch;
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .toolbar button {
+            min-width: 136px;
+        }
+
+        .metrics-grid,
+        .two-column,
+        .three-column,
+        .four-column {
+            display: grid;
+            gap: 18px;
+        }
+
+        .metrics-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            margin-top: 24px;
+        }
+
+        .two-column {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .three-column {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .four-column {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+
+        .metric-card,
+        .card,
+        .panel-section {
+            background: var(--panel);
+            border-radius: var(--radius);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: var(--shadow);
+            -webkit-backdrop-filter: blur(14px);
+            backdrop-filter: blur(14px);
+        }
+
+        .mt-16 {
+            margin-top: 16px;
+        }
+
+        .mt-18 {
+            margin-top: 18px;
+        }
+
+        .metric-card {
+            padding: 18px;
+        }
+
+        .metric-label {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            font-size: 0.82rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .metric-value {
+            margin-top: 12px;
+            font-size: clamp(1.8rem, 1vw + 1.35rem, 2.4rem);
+            font-weight: 800;
+            letter-spacing: -0.04em;
+        }
+
+        .metric-note {
+            margin-top: 8px;
+            color: var(--muted);
+            font-size: 0.92rem;
+        }
+
+        .panel-section {
+            padding: 24px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .section-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            align-items: flex-start;
+            margin-bottom: 18px;
+            flex-wrap: wrap;
+        }
+
+        .section-head h3 {
+            margin: 0;
+            font-size: 1.35rem;
+        }
+
+        .section-head p {
+            margin: 6px 0 0;
+            color: var(--muted);
+            max-width: 60ch;
+            line-height: 1.55;
+        }
+
+        .section-tag {
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(255, 180, 84, 0.12);
+            border: 1px solid rgba(255, 180, 84, 0.22);
+            color: #ffd9a8;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            white-space: nowrap;
+        }
+
+        .card {
+            padding: 20px;
+        }
+
+        .card h4 {
+            margin: 0;
+            font-size: 1.02rem;
+        }
+
+        .card-subtitle {
+            margin: 8px 0 0;
+            color: var(--muted);
+            line-height: 1.5;
+            font-size: 0.92rem;
+        }
+
+        .card-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: flex-start;
+            margin-bottom: 16px;
+        }
+
+        .card-badge {
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.06);
+            font-size: 0.8rem;
+            color: var(--muted);
+            white-space: nowrap;
+        }
+
+        .list,
+        .chip-list,
+        .inline-actions,
+        .stack {
+            display: grid;
+            gap: 12px;
+        }
+
+        .list-item,
+        .queue-item,
+        .squad-item,
+        .giveaway-item,
+        .streamer-item,
+        .table-row {
+            display: grid;
+            gap: 8px;
+            padding: 14px 16px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .leaderboard-row {
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            align-items: center;
+            gap: 14px;
+            padding: 12px 14px;
+            border-radius: 15px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .leaderboard-rank {
+            width: 34px;
+            height: 34px;
+            display: grid;
+            place-items: center;
+            border-radius: 12px;
+            color: white;
+            font-weight: 800;
+            background: linear-gradient(145deg, rgba(255, 180, 84, 0.8), rgba(255, 111, 97, 0.85));
+        }
+
+        .leaderboard-name {
+            font-weight: 700;
+        }
+
+        .leaderboard-note,
+        .meta-line,
+        .small-muted,
+        .empty-state {
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        .leaderboard-value {
+            font-weight: 800;
+            color: #ffffff;
+        }
+
+        .chip-list {
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        }
+
+        .chip,
+        .streamer-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            padding: 10px 12px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.07);
+        }
+
+        .chip-button,
+        .table-button {
+            padding: 8px 10px;
+            font-size: 0.82rem;
+            border-radius: 12px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .form-grid.single {
+            grid-template-columns: 1fr;
+        }
+
+        .field {
+            display: grid;
+            gap: 8px;
+        }
+
+        .field label {
+            color: var(--muted);
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            font-weight: 700;
+        }
+
+        .field input,
+        .field select,
+        .field textarea,
+        .search-input {
+            width: 100%;
+            padding: 12px 14px;
+            border-radius: 14px;
+            background: rgba(7, 15, 24, 0.78);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: var(--text);
+            outline: none;
+            transition: border-color 140ms ease, box-shadow 140ms ease;
+        }
+
+        .field textarea {
+            min-height: 110px;
+            resize: vertical;
+        }
+
+        .field input:focus,
+        .field select:focus,
+        .field textarea:focus,
+        .search-input:focus {
+            border-color: rgba(79, 209, 197, 0.7);
+            box-shadow: 0 0 0 3px rgba(79, 209, 197, 0.16);
+        }
+
+        .form-actions,
+        .inline-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 14px;
+        }
+
+        .split {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .progress-shell {
+            height: 12px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.08);
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, var(--accent), var(--accent-warm));
+            width: 0;
+        }
+
+        .table {
+            display: grid;
+            gap: 10px;
+        }
+
+        .table-header,
+        .table-row {
+            grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.9fr) auto;
+            align-items: center;
+        }
+
+        .table-header {
+            display: grid;
+            gap: 10px;
+            padding: 0 8px;
+            color: var(--muted);
+            font-size: 0.76rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .table-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .current-track {
+            padding: 16px;
+            border-radius: 18px;
+            background: linear-gradient(145deg, rgba(79, 209, 197, 0.1), rgba(29, 155, 240, 0.12));
+            border: 1px solid rgba(79, 209, 197, 0.18);
+        }
+
+        .track-title {
+            font-size: 1.08rem;
+            font-weight: 800;
+        }
+
+        .track-meta {
+            margin-top: 6px;
+            color: var(--muted);
+            font-size: 0.92rem;
+        }
+
+        .inline-stat-grid {
+            display: grid;
+            gap: 12px;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        }
+
+        .inline-stat {
+            padding: 12px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .inline-stat span {
+            display: block;
+            color: var(--muted);
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .inline-stat strong {
+            display: block;
+            margin-top: 8px;
+            font-size: 1.25rem;
+        }
+
+        .muted-box,
+        .toast {
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .muted-box {
+            padding: 14px 16px;
+            color: var(--muted);
+            line-height: 1.55;
+        }
+
+        .search-shell {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .range-wrap {
+            display: grid;
+            gap: 8px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            accent-color: var(--accent);
+        }
+
+        .toast-stack {
+            position: fixed;
+            right: 22px;
+            bottom: 22px;
+            display: grid;
+            gap: 10px;
+            width: min(360px, calc(100vw - 44px));
+            z-index: 100;
+        }
+
+        .toast {
+            padding: 14px 16px;
+            color: var(--text);
+            background: rgba(10, 22, 34, 0.96);
+            box-shadow: var(--shadow);
+            animation: slide-in 180ms ease;
+        }
+
+        .toast.error {
+            border-color: rgba(255, 107, 107, 0.5);
+        }
+
+        .toast.success {
+            border-color: rgba(47, 191, 113, 0.5);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        @keyframes slide-in {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 1220px) {
+            .layout {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                position: static;
+            }
+
+            .metrics-grid,
+            .four-column {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 920px) {
+            .two-column,
+            .three-column,
+            .metrics-grid,
+            .four-column,
+            .form-grid,
+            .table-header,
+            .table-row {
+                grid-template-columns: 1fr;
+            }
+
+            .table-actions {
+                justify-content: flex-start;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .layout {
+                padding: 14px;
+            }
+
+            .hero,
+            .panel-section,
+            .card,
+            .metric-card,
+            .sidebar {
+                border-radius: 22px;
+                padding-left: 18px;
+                padding-right: 18px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="layout">
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-row">
+                    <div class="brand-badge">RB</div>
+                    <div class="brand-copy">
+                        <h1>Ricky Bobby Ops</h1>
+                        <p>Structured control center</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="status-pill">
+                <span class="status-dot" id="sidebar-status-dot"></span>
+                <span id="sidebar-status-text">Loading</span>
+            </div>
+
+            <p class="nav-label">Sections</p>
+            <nav class="section-nav" id="section-nav">
+                <a class="section-link active" href="#overview" data-section-link="overview">
+                    <span>01</span>
+                    <span><strong>Overview</strong><small>Health and leaders</small></span>
+                    <span class="section-count" id="count-overview">-</span>
+                </a>
+                <a class="section-link" href="#community" data-section-link="community">
+                    <span>02</span>
+                    <span><strong>Community</strong><small>Activity and squads</small></span>
+                    <span class="section-count" id="count-community">-</span>
+                </a>
+                <a class="section-link" href="#moderation" data-section-link="moderation">
+                    <span>03</span>
+                    <span><strong>Moderation</strong><small>Member actions</small></span>
+                    <span class="section-count" id="count-moderation">-</span>
+                </a>
+                <a class="section-link" href="#giveaways" data-section-link="giveaways">
+                    <span>04</span>
+                    <span><strong>Giveaways</strong><small>Live promotions</small></span>
+                    <span class="section-count" id="count-giveaways">-</span>
+                </a>
+                <a class="section-link" href="#music" data-section-link="music">
+                    <span>05</span>
+                    <span><strong>Music</strong><small>Queue and voice</small></span>
+                    <span class="section-count" id="count-music">-</span>
+                </a>
+                <a class="section-link" href="#safety" data-section-link="safety">
+                    <span>06</span>
+                    <span><strong>Safety</strong><small>Words and roles</small></span>
+                    <span class="section-count" id="count-safety">-</span>
+                </a>
+                <a class="section-link" href="#economy" data-section-link="economy">
+                    <span>07</span>
+                    <span><strong>Community Tools</strong><small>Rank, LFG, PokeCoins</small></span>
+                    <span class="section-count" id="count-economy">-</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-actions">
+                <button type="button" id="refresh-all">Refresh all data</button>
+                <a href="/logout">Log out</a>
+            </div>
+        </aside>
+
+        <main class="main">
+            <section class="hero">
+                <div class="hero-top">
+                    <div>
+                        <span class="eyebrow">Operator {{ username|e }}</span>
+                        <h2>Organized control for every bot system.</h2>
+                        <p>The dashboard is split into focused categories so routine checks, moderation, giveaways, music, safety tools, and economy actions stay separated instead of fighting for the same space.</p>
+                    </div>
+                    <div class="toolbar">
+                        <button type="button" id="jump-moderation" class="secondary">Jump to moderation</button>
+                        <button type="button" id="jump-music">Open music controls</button>
+                    </div>
+                </div>
+
+                <div class="metrics-grid">
+                    <article class="metric-card">
+                        <div class="metric-label"><span>Bot status</span><span id="metric-bot-status-chip">-</span></div>
+                        <div class="metric-value" id="metric-bot-status">--</div>
+                        <div class="metric-note" id="metric-bot-name">Waiting for bot data</div>
+                    </article>
+                    <article class="metric-card">
+                        <div class="metric-label"><span>Guild reach</span><span>Members</span></div>
+                        <div class="metric-value" id="metric-member-count">0</div>
+                        <div class="metric-note" id="metric-guild-name">Unknown server</div>
+                    </article>
+                    <article class="metric-card">
+                        <div class="metric-label"><span>Open workload</span><span>Tickets + giveaways</span></div>
+                        <div class="metric-value" id="metric-workload">0</div>
+                        <div class="metric-note" id="metric-workload-note">No active workload yet</div>
+                    </article>
+                    <article class="metric-card">
+                        <div class="metric-label"><span>Live coverage</span><span>Streamers</span></div>
+                        <div class="metric-value" id="metric-live-count">0</div>
+                        <div class="metric-note" id="metric-live-note">No live streamers detected</div>
+                    </article>
+                </div>
+            </section>
+
+            <section class="panel-section" id="overview" data-observe-section="overview">
+                <div class="section-head">
+                    <div>
+                        <h3>Overview</h3>
+                        <p>Top-level health, leaderboards, and what is active right now.</p>
+                    </div>
+                    <span class="section-tag">Daily checks</span>
+                </div>
+
+                <div class="three-column">
+                    <article class="card">
+                        <div class="card-head">
+                            <div>
+                                <h4>XP leaderboard</h4>
+                                <p class="card-subtitle">Highest XP members and current level progress.</p>
+                            </div>
+                            <span class="card-badge" id="xp-total-count">0</span>
+                        </div>
+                        <div class="list" id="xp-leaderboard"></div>
+                    </article>
+
+                    <article class="card">
+                        <div class="card-head">
+                            <div>
+                                <h4>Voice leaderboard</h4>
+                                <p class="card-subtitle">Most active voice members.</p>
+                            </div>
+                            <span class="card-badge" id="voice-total-count">0</span>
+                        </div>
+                        <div class="list" id="voice-leaderboard"></div>
+                    </article>
+
+                    <article class="card">
+                        <div class="card-head">
+                            <div>
+                                <h4>Invite leaderboard</h4>
+                                <p class="card-subtitle">Who is driving the most server growth.</p>
+                            </div>
+                            <span class="card-badge" id="invite-total-count">0</span>
+                        </div>
+                        <div class="list" id="invite-leaderboard"></div>
+                    </article>
+                </div>
+            </section>
+
+            <section class="panel-section" id="community" data-observe-section="community">
+                <div class="section-head">
+                    <div>
+                        <h3>Community</h3>
+                        <p>Engagement totals, squad standings, and streamer coverage in one place.</p>
+                    </div>
+                    <span class="section-tag">Activity and culture</span>
+                </div>
+
+                <div class="two-column">
+                    <article class="card">
+                        <div class="card-head">
+                            <div>
+                                <h4>Community analytics</h4>
+                                <p class="card-subtitle">Profiles, retention signals, and journey completion.</p>
+                            </div>
+                            <span class="card-badge" id="analytics-updated">Live</span>
+                        </div>
+                        <div class="inline-stat-grid">
+                            <div class="inline-stat"><span>Profiles</span><strong id="analytics-profiles">0</strong></div>
+                            <div class="inline-stat"><span>DAU</span><strong id="analytics-dau">0</strong></div>
+                            <div class="inline-stat"><span>WAU</span><strong id="analytics-wau">0</strong></div>
+                            <div class="inline-stat"><span>Active streaks</span><strong id="analytics-streaks">0</strong></div>
+                            <div class="inline-stat"><span>Avg points</span><strong id="analytics-points">0</strong></div>
+                            <div class="inline-stat"><span>Journey completed</span><strong id="analytics-journey">0%</strong></div>
+                        </div>
+                    </article>
+
+                    <article class="card">
+                        <div class="card-head">
+                            <div>
+                                <h4>Top squads</h4>
+                                <p class="card-subtitle">Ranked by points, with mission progress context.</p>
+                            </div>
+                            <span class="card-badge" id="squad-total-count">0</span>
+                        </div>
+                        <div class="list" id="squad-list"></div>
+                    </article>
+                </div>
+
+                <div class="two-column mt-18">
+                    <article class="card">
+                        <div class="card-head">
+                            <div>
+                                <h4>Tracked streamers</h4>
+                                <p class="card-subtitle">Keep streamer automation separated from moderation tools.</p>
+                            </div>
+                            <span class="card-badge" id="streamer-total-count">0</span>
+                        </div>
+                        <div class="form-grid">
+                            <div class="field">
+                                <label for="streamer-name">Streamer name</label>
+                                <input id="streamer-name" type="text" placeholder="Channel or streamer name">
+                            </div>
+                            <div class="field">
+                                <label for="streamer-platform">Platform</label>
+                                <select id="streamer-platform">
+                                    <option value="twitch">Twitch</option>
+                                    <option value="youtube">YouTube</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" id="add-streamer">Add streamer</button>
+                        </div>
+                        <div class="chip-list mt-16" id="streamer-list"></div>
+                    </article>
+
+                    <article class="card">
+                        <div class="card-head">
+                            <div>
+                                <h4>Active giveaways snapshot</h4>
+                                <p class="card-subtitle">See what is currently running without scrolling into the giveaways workspace.</p>
+                            </div>
+                            <span class="card-badge" id="overview-giveaway-count">0</span>
+                        </div>
+                        <div class="list" id="overview-giveaways"></div>
+                    </article>
+                </div>
+            </section>
+
+            <section class="panel-section" id="moderation" data-observe-section="moderation">
+                <div class="section-head">
+                    <div>
+                        <h3>Moderation</h3>
+                        <p>Member actions, channel cleanup, whitelist changes, and ban management grouped together.</p>
+                    </div>
+                    <span class="section-tag">Operator actions</span>
+                </div>
+
+                <div class="three-column">
+                    <article class="card">
+                        <div class="card-head">
+                            <div>
+                                <h4>Member actions</h4>
+                                <p class="card-subtitle">One member picker for ban, kick, timeout, or unmute.</p>
+                            </div>
+                            <span class="card-badge">Quick actions</span>
+                        </div>
+                        <div class="form-grid single">
+                            <div class="field">
+                                <label for="moderation-member">Member</label>
+                                <select id="moderation-member"></select>
+                            </div>
+                            <div class="field">
+                                <label for="moderation-reason">Reason</label>
+                                <input id="moderation-reason" type="text" placeholder="Moderator note or reason">
+                            </div>
+                            <div class="field">
+                                <label for="moderation-timeout">Timeout minutes</label>
+                                <input id="moderation-timeout" type="number" min="1" value="10">
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" data-action="ban">Ban</button>
+                            <button type="button" data-action="kick" class="secondary">Kick</button>
+                            <button type="button" data-action="timeout" class="secondary">Timeout</button>
+                            <button type="button" data-action="unmute" class="secondary">Unmute</button>
+                        </div>
+                    </article>
+
+                    <article class="card">
+                        <div class="card-head">
+                            <div>
+                                <h4>Channel operations</h4>
+                                <p class="card-subtitle">Cleanup and announcements stay with other moderation tools.</p>
+                            </div>
+                            <span class="card-badge">Channels</span>
+                        </div>
+                        <div class="form-grid single">
+                            <div class="field">
+                                <label for="channel-operations-channel">Text channel</label>
+                                <select id="channel-operations-channel"></select>
+                            </div>
+                            <div class="field">
+                                <label for="channel-operations-amount">Messages to clear</label>
+                                <input id="channel-operations-amount" type="number" min="1" max="100" value="10">
+                            </div>
+                            <div class="field">
+                                <label for="channel-operations-message">Announcement</label>
+                                <textarea id="channel-operations-message" placeholder="Type an announcement for the selected channel"></textarea>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" id="clear-channel">Clear messages</button>
+                            <button type="button" id="announce-channel" class="secondary">Send announcement</button>
+                        </div>
+                    </article>
+
+                    <article class="card">
+                        <div class="card-head">
+                            <div>
+                                <h4>Whitelist controls</h4>
+                                <p class="card-subtitle">Protected members are separated from enforcement actions.</p>
+                            </div>
+                            <span class="card-badge" id="whitelist-count">0</span>
+                        </div>
+                        <div class="form-grid single">
+                            <div class="field">
+                                <label for="whitelist-member">Member</label>
+                                <select id="whitelist-member"></select>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" id="whitelist-add">Add to whitelist</button>
+                            <button type="button" id="whitelist-remove" class="secondary">Remove from whitelist</button>
+                        </div>
+                        <div class="chip-list mt-16" id="whitelist-list"></div>
+                    </article>
+                </div>
+
+                <div class="two-column mt-18">
+                    <article class="card">
+                        <div class="card-head">
+                            <div>
+                                <h4>Ban register</h4>
+                                <p class="card-subtitle">Recent bans and a direct path to unban specific IDs.</p>
+                            </div>
+                            <span class="card-badge" id="ban-count">0</span>
+                        </div>
+                        <div class="table">
+                            <div class="table-header">
+                                <span>User</span>
+                                <span>Reason</span>
+                                <span>Action</span>
+                            </div>
+                            <div id="ban-list"></div>
+                        </div>
+                        <div class="form-grid mt-16">
+                            <div class="field">
+                                <label for="unban-id">User ID</label>
+                                <input id="unban-id" type="text" placeholder="Paste banned user ID">
+                            </div>
+                            <div class="field">
+                                <label for="unban-reason">Unban reason</label>
+                                <input id="unban-reason" type="text" placeholder="Unban via dashboard">
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" id="manual-unban">Unban user</button>
+                        </div>
+                    </article>
+
+                    <article class="card">
+                        <div class="card-head">
+                            <div>
+                                <h4>Warnings register</h4>
+                                <p class="card-subtitle">Moderation debt, separated from banned words and whitelist state.</p>
+                            </div>
+                            <span class="card-badge" id="warning-count">0</span>
+                        </div>
+                        <div class="table">
+                            <div class="table-header">
+                                <span>Member</span>
+                                <span>Warnings</span>
+                                <span>Action</span>
+                            </div>
+                            <div id="warning-list"></div>
+                        </div>
+                    </article>
+                </div>
+            </section>
+
+            <section class="panel-section" id="giveaways" data-observe-section="giveaways">
+                <div class="section-head">
+                    <div>
+                        <h3>Giveaways</h3>
+                        <p>Planning and live giveaway management in a dedicated workspace.</p>
+                    </div>
+                    <span class="section-tag">Campaigns</span>
+                </div>
+
+                <div class="two-column">
+                    <article class="card">
+                        <div class="card-head">
+                            <div>
+                                <h4>Start giveaway</h4>
+                                <p class="card-subtitle">Channel, duration, winners, and prize all in one grouped form.</p>
+                            </div>
+                            <span class="card-badge">New giveaway</span>
+                        </div>
+                        <div class="form-grid">
+                            <div class="field">
+                                <label for="giveaway-channel">Text channel</label>
+                                <select id="giveaway-channel"></select>
+                            </div>
+                            <div class="field">
+                                <label for="giveaway-prize">Prize</label>
+                                <input id="giveaway-prize" type="text" placeholder="Nitro, in-game item, role, gift card">
+                            </div>
+                            <div class="field">
+                                <label for="giveaway-minutes">Minutes</label>
+                                <input id="giveaway-minutes" type="number" min="1" value="60">
+                            </div>
+                            <div class="field">
+                                <label for="giveaway-winners">Winners</label>
+                                <input id="giveaway-winners" type="number" min="1" value="1">
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" id="start-giveaway">Launch giveaway</button>
+                        </div>
+                    </article>
+
+                    <article class="card">
+                        <div class="card-head">
+                            <div>
+                                <h4>Active giveaway board</h4>
+                                <p class="card-subtitle">Running promotions with end controls grouped by message ID.</p>
+                            </div>
+                            <span class="card-badge" id="giveaway-active-count">0</span>
+                        </div>
+                        <div class="list" id="giveaway-list"></div>
+                    </article>
+                </div>
+            </section>
+
+            <section class="panel-section" id="music" data-observe-section="music">
+                <div class="section-head">
+                    <div>
+                        <h3>Music</h3>
+                        <p>Queue state, playback control, volume, and voice channel targeting all live in one category.</p>
+                    </div>
+                    <span class="section-tag">Voice and playback</span>
+                </div>
+
+                <div class="two-column">
+                    <article class="card">
+                        <div class="card-head">
+                            <div>
+                                <h4>Now playing and queue</h4>
+                                <p class="card-subtitle">Current track first, queued items below.</p>
+                            </div>
+                            <span class="card-badge" id="music-queue-count">0</span>
+                        </div>
+                        <div id="current-track"></div>
+                        <div class="list mt-16" id="music-queue"></div>
+                    </article>
+
+                    <article class="card">
+                        <div class="card-head">
+                            <div>
+                                <h4>Music controls</h4>
+                                <p class="card-subtitle">Queue tracks, adjust volume, and manage playback.</p>
+                            </div>
+                            <span class="card-badge">Actions</span>
+                        </div>
+                        <div class="form-grid single">
+                            <div class="field">
+                                <label for="music-query">Song or URL</label>
+                                <input id="music-query" type="text" placeholder="Track name, playlist, or URL">
+                            </div>
+                            <div class="field">
+                                <label for="music-voice-channel">Voice channel</label>
+                                <select id="music-voice-channel"></select>
+                            </div>
+                            <div class="field range-wrap">
+                                <label for="music-volume">Volume</label>
+                                <input id="music-volume" type="range" min="0" max="100" value="100">
+                                <div class="small-muted">Volume target: <span id="music-volume-value">100%</span></div>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" id="music-play">Play / queue</button>
+                            <button type="button" id="music-set-volume" class="secondary">Set volume</button>
+                            <button type="button" id="music-skip" class="secondary">Skip</button>
+                            <button type="button" id="music-pause" class="secondary">Pause</button>
+                            <button type="button" id="music-resume" class="secondary">Resume</button>
+                            <button type="button" id="music-stop" class="secondary">Stop</button>
+                            <button type="button" id="music-leave" class="secondary">Leave voice</button>
+                        </div>
+                    </article>
+                </div>
+
+                <article class="card mt-18">
+                    <div class="card-head">
+                        <div>
+                            <h4>Voice channel occupancy</h4>
+                            <p class="card-subtitle">Use this to pick the right channel before queueing music.</p>
+                        </div>
+                        <span class="card-badge" id="voice-channel-count">0</span>
+                    </div>
+                    <div class="chip-list" id="voice-channel-list"></div>
+                </article>
+            </section>
+
+            <section class="panel-section" id="safety" data-observe-section="safety">
+                <div class="section-head">
+                    <div>
+                        <h3>Safety</h3>
+                        <p>Filter words, reaction-role mappings, and other governance controls grouped away from moderation incidents.</p>
+                    </div>
+                    <span class="section-tag">Guardrails and automation</span>
+                </div>
+
+                <div class="two-column">
+                    <article class="card">
+                        <div class="card-head">
+                            <div>
+                                <h4>Banned words</h4>
+                                <p class="card-subtitle">Manage the blocked vocabulary list with quick add and remove controls.</p>
+                            </div>
+                            <span class="card-badge" id="banned-word-count">0</span>
+                        </div>
+                        <div class="search-shell">
+                            <input class="search-input" id="banned-word-input" type="text" placeholder="Add a blocked word or phrase">
+                            <button type="button" id="add-banned-word">Add word</button>
+                        </div>
+                        <div class="chip-list mt-16" id="banned-word-list"></div>
+                    </article>
+
+                    <article class="card">
+                        <div class="card-head">
+                            <div>
+                                <h4>Reaction roles</h4>
+                                <p class="card-subtitle">Assign emoji-role mappings without mixing them into unrelated admin actions.</p>
+                            </div>
+                            <span class="card-badge" id="reaction-role-count">0</span>
+                        </div>
+                        <div class="form-grid">
+                            <div class="field">
+                                <label for="reaction-role-channel">Channel</label>
+                                <select id="reaction-role-channel"></select>
+                            </div>
+                            <div class="field">
+                                <label for="reaction-role-role">Role</label>
+                                <select id="reaction-role-role"></select>
+                            </div>
+                            <div class="field">
+                                <label for="reaction-role-message-id">Message ID</label>
+                                <input id="reaction-role-message-id" type="text" placeholder="Message to react on">
+                            </div>
+                            <div class="field">
+                                <label for="reaction-role-emoji">Emoji</label>
+                                <input id="reaction-role-emoji" type="text" placeholder="Emoji, for example :fire: or 🔥">
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" id="add-reaction-role">Add mapping</button>
+                        </div>
+                        <div class="table mt-16">
+                            <div class="table-header">
+                                <span>Role mapping</span>
+                                <span>Message</span>
+                                <span>Emoji</span>
+                            </div>
+                            <div id="reaction-role-list"></div>
+                        </div>
+                    </article>
+                </div>
+            </section>
+
+            <section class="panel-section" id="economy" data-observe-section="economy">
+                <div class="section-head">
+                    <div>
+                        <h3>Community tools</h3>
+                        <p>Rank lookups, LFG posts, and PokeCoins management grouped into one utility area.</p>
+                    </div>
+                    <span class="section-tag">Member enablement</span>
+                </div>
+
+                <div class="three-column">
+                    <article class="card">
+                        <div class="card-head">
+                            <div>
+                                <h4>Rank lookup</h4>
+                                <p class="card-subtitle">Inspect a member's XP level without digging through leaderboards.</p>
+                            </div>
+                            <span class="card-badge">XP</span>
+                        </div>
+                        <div class="form-grid single">
+                            <div class="field">
+                                <label for="rank-member">Member</label>
+                                <select id="rank-member"></select>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" id="lookup-rank">Look up rank</button>
+                        </div>
+                        <div class="muted-box mt-16" id="rank-result">Select a member to view level and XP progress.</div>
+                    </article>
+
+                    <article class="card">
+                        <div class="card-head">
+                            <div>
+                                <h4>LFG broadcaster</h4>
+                                <p class="card-subtitle">Post a clean LFG embed from one categorized workspace.</p>
+                            </div>
+                            <span class="card-badge">Community posts</span>
+                        </div>
+                        <div class="form-grid">
+                            <div class="field">
+                                <label for="lfg-channel">Text channel</label>
+                                <select id="lfg-channel"></select>
+                            </div>
+                            <div class="field">
+                                <label for="lfg-players">Players needed</label>
+                                <input id="lfg-players" type="number" min="1" value="2">
+                            </div>
+                            <div class="field">
+                                <label for="lfg-game">Game</label>
+                                <input id="lfg-game" type="text" placeholder="Rocket League, Valorant, etc.">
+                            </div>
+                            <div class="field">
+                                <label for="lfg-message">Message</label>
+                                <input id="lfg-message" type="text" placeholder="Optional extra details">
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" id="post-lfg">Post LFG</button>
+                        </div>
+                    </article>
+
+                    <article class="card">
+                        <div class="card-head">
+                            <div>
+                                <h4>PokeCoins control</h4>
+                                <p class="card-subtitle">Grant, remove, or inspect balances without leaving the dashboard.</p>
+                            </div>
+                            <span class="card-badge">Economy</span>
+                        </div>
+                        <div class="form-grid">
+                            <div class="field">
+                                <label for="pokecoins-member">Member</label>
+                                <select id="pokecoins-member"></select>
+                            </div>
+                            <div class="field">
+                                <label for="pokecoins-amount">Amount</label>
+                                <input id="pokecoins-amount" type="number" value="100">
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" id="pokecoins-update">Apply change</button>
+                            <button type="button" id="pokecoins-balance" class="secondary">Check balance</button>
+                        </div>
+                        <div class="muted-box mt-16" id="pokecoins-result">Pick a member and amount to manage PokeCoins.</div>
+                    </article>
+                </div>
+
+                <article class="card mt-18">
+                    <div class="card-head">
+                        <div>
+                            <h4>PokeCoins leaderboard</h4>
+                            <p class="card-subtitle">Current top balances for the server.</p>
+                        </div>
+                        <span class="card-badge" id="pokecoins-total-count">0</span>
+                    </div>
+                    <div class="list" id="pokecoins-leaderboard"></div>
+                </article>
+            </section>
+        </main>
+    </div>
+
+    <div class="toast-stack" id="toast-stack" aria-live="polite"></div>
+
+    <script>
+        const state = {
+            stats: null,
+            community: null,
+            members: [],
+            channels: [],
+            roles: [],
+            voiceChannels: [],
+            bans: [],
+            bannedWords: [],
+            warnings: [],
+            whitelist: [],
+            reactionRoles: [],
+            musicQueue: null,
+            pokecoins: [],
+        };
+
+        const sectionOrder = ["overview", "community", "moderation", "giveaways", "music", "safety", "economy"];
+
+        const $ = (selector) => document.querySelector(selector);
+        const $$ = (selector) => Array.from(document.querySelectorAll(selector));
+
+        function escapeHtml(value) {
+            return String(value ?? "")
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#39;");
+        }
+
+        function formatNumber(value) {
+            return new Intl.NumberFormat().format(Number(value || 0));
+        }
+
+        function formatPercent(value) {
+            return `${Math.round(Number(value || 0) * 100)}%`;
+        }
+
+        function formatMinutes(value) {
+            const minutes = Number(value || 0);
+            if (minutes < 60) {
+                return `${formatNumber(minutes)} min`;
+            }
+            const hours = Math.floor(minutes / 60);
+            const remainder = minutes % 60;
+            return remainder ? `${hours}h ${remainder}m` : `${hours}h`;
+        }
+
+        function formatCountdown(seconds) {
+            const total = Math.max(0, Number(seconds || 0));
+            const hours = Math.floor(total / 3600);
+            const minutes = Math.floor((total % 3600) / 60);
+            const remainingSeconds = total % 60;
+            if (hours > 0) {
+                return `${hours}h ${minutes}m`;
+            }
+            if (minutes > 0) {
+                return `${minutes}m ${remainingSeconds}s`;
+            }
+            return `${remainingSeconds}s`;
+        }
+
+        function toast(message, type = "success") {
+            const stack = $("#toast-stack");
+            const item = document.createElement("div");
+            item.className = `toast ${type}`;
+            item.textContent = message;
+            stack.appendChild(item);
+            window.setTimeout(() => item.remove(), 4200);
+        }
+
+        async function api(url, options = {}) {
+            const config = {
+                method: options.method || "GET",
+                headers: { "Content-Type": "application/json" },
+                credentials: "same-origin",
+            };
+            if (options.body !== undefined) {
+                config.body = JSON.stringify(options.body);
+            }
+            const response = await fetch(url, config);
+            const text = await response.text();
+            let payload;
+            try {
+                payload = text ? JSON.parse(text) : {};
+            } catch {
+                payload = { error: text || "Unknown response" };
+            }
+            if (!response.ok) {
+                throw new Error(payload.error || `Request failed (${response.status})`);
+            }
+            return payload;
+        }
+
+        function emptyState(message) {
+            return `<div class="empty-state">${escapeHtml(message)}</div>`;
+        }
+
+        function populateSelect(selectId, items, placeholder) {
+            const select = $(selectId);
+            if (!select) {
+                return;
+            }
+            const options = [`<option value="">${escapeHtml(placeholder)}</option>`];
+            for (const item of items) {
+                options.push(`<option value="${escapeHtml(item.id)}">${escapeHtml(item.display || item.name)}</option>`);
+            }
+            select.innerHTML = options.join("");
+            if (items.length === 1) {
+                select.value = items[0].id;
+            }
+        }
+
+        function renderLeaderboard(targetId, rows, valueKey, formatter, noteFormatter) {
+            const target = $(targetId);
+            if (!target) {
+                return;
+            }
+            if (!rows || !rows.length) {
+                target.innerHTML = emptyState("No leaderboard data available yet.");
+                return;
+            }
+            target.innerHTML = rows.map((row, index) => `
+                <div class="leaderboard-row">
+                    <div class="leaderboard-rank">${index + 1}</div>
+                    <div>
+                        <div class="leaderboard-name">${escapeHtml(row.name)}</div>
+                        <div class="leaderboard-note">${escapeHtml(noteFormatter(row))}</div>
+                    </div>
+                    <div class="leaderboard-value">${escapeHtml(formatter(row[valueKey]))}</div>
+                </div>
+            `).join("");
+        }
+
+        function renderOverview() {
+            const stats = state.stats || {};
+            const botOnline = Boolean(stats.bot_online);
+            $("#metric-bot-status").textContent = botOnline ? "Online" : "Offline";
+            $("#metric-bot-status-chip").textContent = botOnline ? "Ready" : "Waiting";
+            $("#metric-bot-name").textContent = stats.bot_name || "Unknown bot";
+            $("#metric-member-count").textContent = formatNumber(stats.member_count || 0);
+            $("#metric-guild-name").textContent = stats.guild_name || "Unknown server";
+            const workload = Number(stats.open_tickets || 0) + Number(stats.active_giveaways || 0);
+            $("#metric-workload").textContent = formatNumber(workload);
+            $("#metric-workload-note").textContent = `${formatNumber(stats.open_tickets || 0)} open tickets and ${formatNumber(stats.active_giveaways || 0)} active giveaways`;
+            $("#metric-live-count").textContent = formatNumber(stats.streamers_live || 0);
+            $("#metric-live-note").textContent = `${formatNumber(stats.streamers_total || 0)} tracked streamers`;
+            $("#sidebar-status-text").textContent = botOnline ? "Online" : "Offline";
+            $("#sidebar-status-dot").style.background = botOnline ? "var(--success)" : "var(--danger)";
+
+            renderLeaderboard("#xp-leaderboard", stats.xp_leaderboard || [], "xp", formatNumber, (row) => `Level ${row.level}`);
+            renderLeaderboard("#voice-leaderboard", stats.voice_leaderboard || [], "minutes", formatMinutes, () => "Voice minutes");
+            renderLeaderboard("#invite-leaderboard", stats.invite_leaderboard || [], "invites", formatNumber, () => "Invites");
+
+            $("#xp-total-count").textContent = String((stats.xp_leaderboard || []).length);
+            $("#voice-total-count").textContent = String((stats.voice_leaderboard || []).length);
+            $("#invite-total-count").textContent = String((stats.invite_leaderboard || []).length);
+
+            renderGiveawayOverview(stats.giveaways || []);
+            renderStreamers(stats.streamers || []);
+            updateSectionCounts();
+        }
+
+        function renderGiveawayOverview(giveaways) {
+            const target = $("#overview-giveaways");
+            $("#overview-giveaway-count").textContent = String(giveaways.length || 0);
+            $("#giveaway-active-count").textContent = String(giveaways.length || 0);
+            if (!giveaways.length) {
+                const empty = emptyState("No giveaways are active right now.");
+                target.innerHTML = empty;
+                $("#giveaway-list").innerHTML = empty;
+                return;
+            }
+
+            target.innerHTML = giveaways.map((item) => `
+                <div class="giveaway-item">
+                    <div class="split">
+                        <strong>${escapeHtml(item.prize)}</strong>
+                        <span class="small-muted">${item.ended ? "Ended" : `${formatCountdown(item.ends_in)} left`}</span>
+                    </div>
+                    <div class="meta-line">Message ID ${escapeHtml(item.message_id)} with ${escapeHtml(item.winners)} winner(s)</div>
+                </div>
+            `).join("");
+
+            $("#giveaway-list").innerHTML = giveaways.map((item) => `
+                <div class="giveaway-item">
+                    <div class="split">
+                        <strong>${escapeHtml(item.prize)}</strong>
+                        <span class="small-muted">${item.ended ? "Ended" : `${formatCountdown(item.ends_in)} left`}</span>
+                    </div>
+                    <div class="meta-line">Message ID ${escapeHtml(item.message_id)} with ${escapeHtml(item.winners)} winner(s)</div>
+                    <div class="table-actions">
+                        <button type="button" class="table-button secondary" data-end-giveaway="${escapeHtml(item.message_id)}">End giveaway</button>
+                    </div>
+                </div>
+            `).join("");
+        }
+
+        function renderCommunity() {
+            const community = state.community || { totals: {}, top_squads: [] };
+            const totals = community.totals || {};
+            $("#analytics-profiles").textContent = formatNumber(totals.profiles || 0);
+            $("#analytics-dau").textContent = formatNumber(totals.dau || 0);
+            $("#analytics-wau").textContent = formatNumber(totals.wau || 0);
+            $("#analytics-streaks").textContent = formatNumber(totals.active_streaks || 0);
+            $("#analytics-points").textContent = formatNumber(totals.avg_points || 0);
+            $("#analytics-journey").textContent = formatPercent(totals.journey_completion_rate || 0);
+
+            const squads = community.top_squads || [];
+            $("#squad-total-count").textContent = String(squads.length);
+            $("#squad-list").innerHTML = squads.length ? squads.map((row) => {
+                const target = Number(row.mission_target || 0);
+                const percent = target > 0 ? Math.min(100, Math.round((Number(row.points || 0) / target) * 100)) : 0;
+                return `
+                    <div class="squad-item">
+                        <div class="split">
+                            <strong>${escapeHtml(row.name)}</strong>
+                            <span class="small-muted">${escapeHtml(row.members)} members</span>
+                        </div>
+                        <div class="meta-line">${formatNumber(row.points)} pts${target ? ` of ${formatNumber(target)} target` : ""}${row.mission_claimed ? " | mission claimed" : ""}</div>
+                        <div class="progress-shell"><div class="progress-bar" style="width:${percent}%;"></div></div>
+                    </div>
+                `;
+            }).join("") : emptyState("No squads tracked yet.");
+        }
+
+        function renderStreamers(streamers) {
+            $("#streamer-total-count").textContent = String(streamers.length || 0);
+            const target = $("#streamer-list");
+            if (!streamers.length) {
+                target.innerHTML = emptyState("No streamers are currently being tracked.");
+                return;
+            }
+            target.innerHTML = streamers.map((streamer) => `
+                <div class="streamer-chip">
+                    <strong>${escapeHtml(streamer.name)}</strong>
+                    <span class="small-muted">${escapeHtml(streamer.platform)}</span>
+                    <span class="small-muted">${streamer.last_live ? "recently live" : "not live recently"}</span>
+                    <button type="button" class="chip-button secondary" data-remove-streamer="${escapeHtml(streamer.name)}">Remove</button>
+                </div>
+            `).join("");
+        }
+
+        function renderModeration() {
+            $("#whitelist-count").textContent = String(state.whitelist.length || 0);
+            $("#warning-count").textContent = String(state.warnings.length || 0);
+            $("#ban-count").textContent = String(state.bans.length || 0);
+
+            $("#whitelist-list").innerHTML = state.whitelist.length ? state.whitelist.map((member) => `
+                <div class="chip">
+                    <strong>${escapeHtml(member.name)}</strong>
+                    <span class="small-muted">${escapeHtml(member.id)}</span>
+                </div>
+            `).join("") : emptyState("Whitelist is empty.");
+
+            $("#ban-list").innerHTML = state.bans.length ? state.bans.map((entry) => `
+                <div class="table-row">
+                    <div>
+                        <strong>${escapeHtml(entry.name)}</strong>
+                        <div class="small-muted">${escapeHtml(entry.id)}</div>
+                    </div>
+                    <div class="small-muted">${escapeHtml(entry.reason || "No reason set")}</div>
+                    <div class="table-actions">
+                        <button type="button" class="table-button secondary" data-unban-id="${escapeHtml(entry.id)}">Unban</button>
+                    </div>
+                </div>
+            `).join("") : emptyState("No bans found.");
+
+            $("#warning-list").innerHTML = state.warnings.length ? state.warnings.map((entry) => `
+                <div class="table-row">
+                    <div>
+                        <strong>${escapeHtml(entry.name)}</strong>
+                        <div class="small-muted">${escapeHtml(entry.id)}</div>
+                    </div>
+                    <div class="small-muted">${escapeHtml(entry.count)} warning(s)</div>
+                    <div class="table-actions">
+                        <button type="button" class="table-button secondary" data-clear-warning="${escapeHtml(entry.id)}">Clear</button>
+                    </div>
+                </div>
+            `).join("") : emptyState("No active warnings.");
+        }
+
+        function renderMusic() {
+            const queue = state.musicQueue || { current: null, queue: [], volume: 100 };
+            const currentTrack = $("#current-track");
+            $("#music-volume").value = String(queue.volume ?? 100);
+            $("#music-volume-value").textContent = `${queue.volume ?? 100}%`;
+            $("#music-queue-count").textContent = String((queue.queue || []).length);
+            $("#voice-channel-count").textContent = String(state.voiceChannels.length || 0);
+
+            if (queue.current) {
+                currentTrack.innerHTML = `
+                    <div class="current-track">
+                        <div class="track-title">${escapeHtml(queue.current.title)}</div>
+                        <div class="track-meta">${escapeHtml(queue.current.duration || "Unknown duration")} | Requested by ${escapeHtml(queue.current.requester || "Unknown")}</div>
+                    </div>
+                `;
+            } else {
+                currentTrack.innerHTML = emptyState("Nothing is currently playing.");
+            }
+
+            $("#music-queue").innerHTML = (queue.queue || []).length ? queue.queue.map((entry, index) => `
+                <div class="queue-item">
+                    <strong>${index + 1}. ${escapeHtml(entry.title)}</strong>
+                    <div class="small-muted">${escapeHtml(entry.duration || "Unknown duration")} | Requested by ${escapeHtml(entry.requester || "Unknown")}</div>
+                </div>
+            `).join("") : emptyState("The queue is empty.");
+
+            $("#voice-channel-list").innerHTML = state.voiceChannels.length ? state.voiceChannels.map((channel) => `
+                <div class="chip">
+                    <strong>${escapeHtml(channel.name)}</strong>
+                    <span class="small-muted">${escapeHtml(channel.members)} member(s)</span>
+                </div>
+            `).join("") : emptyState("No voice channels found.");
+        }
+
+        function renderSafety() {
+            $("#banned-word-count").textContent = String(state.bannedWords.length || 0);
+            $("#reaction-role-count").textContent = String(state.reactionRoles.length || 0);
+            $("#banned-word-list").innerHTML = state.bannedWords.length ? state.bannedWords.map((word) => `
+                <div class="chip">
+                    <strong>${escapeHtml(word)}</strong>
+                    <button type="button" class="chip-button secondary" data-remove-word="${escapeHtml(word)}">Remove</button>
+                </div>
+            `).join("") : emptyState("No banned words configured.");
+
+            $("#reaction-role-list").innerHTML = state.reactionRoles.length ? state.reactionRoles.map((entry) => `
+                <div class="table-row">
+                    <div>
+                        <strong>${escapeHtml(entry.role_name)}</strong>
+                        <div class="small-muted">Role ID ${escapeHtml(entry.role_id)}</div>
+                    </div>
+                    <div class="small-muted">${escapeHtml(entry.message_id)}</div>
+                    <div class="small-muted">${escapeHtml(entry.emoji)}</div>
+                </div>
+            `).join("") : emptyState("No reaction roles configured.");
+        }
+
+        function renderEconomy() {
+            $("#pokecoins-total-count").textContent = String(state.pokecoins.length || 0);
+            $("#pokecoins-leaderboard").innerHTML = state.pokecoins.length ? state.pokecoins.slice(0, 10).map((entry, index) => `
+                <div class="leaderboard-row">
+                    <div class="leaderboard-rank">${index + 1}</div>
+                    <div>
+                        <div class="leaderboard-name">${escapeHtml(entry.name)}</div>
+                        <div class="leaderboard-note">User ${escapeHtml(entry.user_id)}</div>
+                    </div>
+                    <div class="leaderboard-value">${formatNumber(entry.balance)}</div>
+                </div>
+            `).join("") : emptyState("No PokeCoins balances are available.");
+        }
+
+        function updateSectionCounts() {
+            const stats = state.stats || { giveaways: [], streamers: [] };
+            const community = state.community || { totals: {} };
+            const counts = {
+                overview: Number(stats.member_count || 0),
+                community: Number((community.totals || {}).profiles || 0),
+                moderation: Number(state.warnings.length || 0) + Number(state.bans.length || 0),
+                giveaways: Number((stats.giveaways || []).length || 0),
+                music: Number((state.musicQueue?.queue || []).length || 0) + (state.musicQueue?.current ? 1 : 0),
+                safety: Number(state.bannedWords.length || 0) + Number(state.reactionRoles.length || 0),
+                economy: Number(state.pokecoins.length || 0),
+            };
+            for (const [key, value] of Object.entries(counts)) {
+                const target = document.getElementById(`count-${key}`);
+                if (target) {
+                    target.textContent = formatNumber(value);
+                }
+            }
+        }
+
+        async function loadReferenceData() {
+            const [members, channels, roles, voiceChannels] = await Promise.all([
+                api("/api/members"),
+                api("/api/channels"),
+                api("/api/roles"),
+                api("/api/voice-channels"),
+            ]);
+            state.members = members.members || [];
+            state.channels = channels.channels || [];
+            state.roles = roles.roles || [];
+            state.voiceChannels = voiceChannels.channels || [];
+
+            const memberSelects = ["#moderation-member", "#whitelist-member", "#rank-member", "#pokecoins-member"];
+            for (const selectId of memberSelects) {
+                populateSelect(selectId, state.members, "Select member");
+            }
+            const channelSelects = ["#channel-operations-channel", "#giveaway-channel", "#lfg-channel", "#reaction-role-channel"];
+            for (const selectId of channelSelects) {
+                populateSelect(selectId, state.channels, "Select channel");
+            }
+            populateSelect("#music-voice-channel", state.voiceChannels, "Select voice channel");
+            populateSelect("#reaction-role-role", state.roles, "Select role");
+        }
+
+        async function loadLiveData() {
+            const [stats, community, bans, bannedWords, warnings, whitelist, reactionRoles, musicQueue, pokecoins] = await Promise.all([
+                api("/api/stats"),
+                api("/api/analytics/community"),
+                api("/api/bans"),
+                api("/api/banned-words"),
+                api("/api/warnings"),
+                api("/api/whitelist"),
+                api("/api/reaction-roles"),
+                api("/api/music/queue"),
+                api("/api/pokecoins/leaderboard"),
+            ]);
+            state.stats = stats;
+            state.community = community;
+            state.bans = bans.bans || [];
+            state.bannedWords = bannedWords.words || [];
+            state.warnings = warnings.warnings || [];
+            state.whitelist = whitelist.members || [];
+            state.reactionRoles = reactionRoles.reaction_roles || [];
+            state.musicQueue = musicQueue;
+            state.pokecoins = Array.isArray(pokecoins) ? pokecoins : [];
+
+            renderOverview();
+            renderCommunity();
+            renderModeration();
+            renderMusic();
+            renderSafety();
+            renderEconomy();
+            updateSectionCounts();
+        }
+
+        async function refreshAll(showToast = false) {
+            try {
+                await loadReferenceData();
+                await loadLiveData();
+                if (showToast) {
+                    toast("Dashboard data refreshed.");
+                }
+            } catch (error) {
+                toast(error.message || "Failed to refresh dashboard data.", "error");
+            }
+        }
+
+        function selectedValue(id) {
+            return $(id)?.value?.trim() || "";
+        }
+
+        async function performModerationAction(action) {
+            const userId = selectedValue("#moderation-member");
+            if (!userId) {
+                toast("Select a member first.", "error");
+                return;
+            }
+            const reason = selectedValue("#moderation-reason");
+            const payload = { user_id: userId, reason };
+            if (action === "timeout") {
+                payload.minutes = Number(selectedValue("#moderation-timeout") || 10);
+            }
+            if (action === "unmute") {
+                delete payload.reason;
+            }
+            const endpoint = action === "unmute" ? "/api/mod/unmute" : `/api/mod/${action}`;
+            const response = await api(endpoint, { method: "POST", body: payload });
+            toast(response.message || `${action} completed.`);
+            await loadLiveData();
+        }
+
+        async function performUnban(userId) {
+            const reason = selectedValue("#unban-reason") || "Unbanned via dashboard";
+            const response = await api("/api/unban", { method: "POST", body: { user_id: userId, reason } });
+            toast(response.username ? `Unbanned ${response.username}` : "User unbanned.");
+            await loadLiveData();
+        }
+
+        function bindButtons() {
+            $("#refresh-all").addEventListener("click", () => refreshAll(true));
+            $("#jump-moderation").addEventListener("click", () => location.hash = "moderation");
+            $("#jump-music").addEventListener("click", () => location.hash = "music");
+            $("#music-volume").addEventListener("input", (event) => {
+                $("#music-volume-value").textContent = `${event.target.value}%`;
+            });
+
+            $$('[data-action]').forEach((button) => {
+                button.addEventListener("click", async () => {
+                    try {
+                        await performModerationAction(button.dataset.action);
+                    } catch (error) {
+                        toast(error.message, "error");
+                    }
+                });
+            });
+
+            $("#clear-channel").addEventListener("click", async () => {
+                try {
+                    const response = await api("/api/mod/clear", {
+                        method: "POST",
+                        body: {
+                            channel_id: selectedValue("#channel-operations-channel"),
+                            amount: Number(selectedValue("#channel-operations-amount") || 10),
+                        },
+                    });
+                    toast(response.message || "Messages cleared.");
+                } catch (error) {
+                    toast(error.message, "error");
+                }
+            });
+
+            $("#announce-channel").addEventListener("click", async () => {
+                try {
+                    const response = await api("/api/mod/announce", {
+                        method: "POST",
+                        body: {
+                            channel_id: selectedValue("#channel-operations-channel"),
+                            message: selectedValue("#channel-operations-message"),
+                        },
+                    });
+                    toast(response.message || "Announcement sent.");
+                    $("#channel-operations-message").value = "";
+                } catch (error) {
+                    toast(error.message, "error");
+                }
+            });
+
+            $("#whitelist-add").addEventListener("click", async () => {
+                try {
+                    const response = await api("/api/mod/whitelist/add", {
+                        method: "POST",
+                        body: { user_id: selectedValue("#whitelist-member") },
+                    });
+                    toast(response.message || "Member added to whitelist.");
+                    await loadLiveData();
+                } catch (error) {
+                    toast(error.message, "error");
+                }
+            });
+
+            $("#whitelist-remove").addEventListener("click", async () => {
+                try {
+                    const response = await api("/api/mod/whitelist/remove", {
+                        method: "POST",
+                        body: { user_id: selectedValue("#whitelist-member") },
+                    });
+                    toast(response.message || "Member removed from whitelist.");
+                    await loadLiveData();
+                } catch (error) {
+                    toast(error.message, "error");
+                }
+            });
+
+            $("#manual-unban").addEventListener("click", async () => {
+                try {
+                    const userId = selectedValue("#unban-id");
+                    if (!userId) {
+                        throw new Error("Enter a user ID to unban.");
+                    }
+                    await performUnban(userId);
+                    $("#unban-id").value = "";
+                } catch (error) {
+                    toast(error.message, "error");
+                }
+            });
+
+            $("#start-giveaway").addEventListener("click", async () => {
+                try {
+                    const response = await api("/api/giveaways/start", {
+                        method: "POST",
+                        body: {
+                            channel_id: selectedValue("#giveaway-channel"),
+                            prize: selectedValue("#giveaway-prize"),
+                            minutes: Number(selectedValue("#giveaway-minutes") || 60),
+                            winners: Number(selectedValue("#giveaway-winners") || 1),
+                        },
+                    });
+                    toast(response.message || "Giveaway started.");
+                    $("#giveaway-prize").value = "";
+                    await loadLiveData();
+                } catch (error) {
+                    toast(error.message, "error");
+                }
+            });
+
+            $("#music-play").addEventListener("click", async () => {
+                try {
+                    const response = await api("/api/music/play", {
+                        method: "POST",
+                        body: {
+                            query: selectedValue("#music-query"),
+                            voice_channel_id: selectedValue("#music-voice-channel"),
+                        },
+                    });
+                    toast(response.message || "Track queued.");
+                    $("#music-query").value = "";
+                    await loadLiveData();
+                } catch (error) {
+                    toast(error.message, "error");
+                }
+            });
+
+            $("#music-set-volume").addEventListener("click", async () => {
+                try {
+                    const response = await api("/api/music/volume", {
+                        method: "POST",
+                        body: { level: Number(selectedValue("#music-volume") || 100) },
+                    });
+                    toast(response.message || "Volume updated.");
+                } catch (error) {
+                    toast(error.message, "error");
+                }
+            });
+
+            const musicButtons = [
+                ["#music-skip", "/api/music/skip"],
+                ["#music-pause", "/api/music/pause"],
+                ["#music-resume", "/api/music/resume"],
+                ["#music-stop", "/api/music/stop"],
+                ["#music-leave", "/api/music/leave"],
+            ];
+            for (const [selector, endpoint] of musicButtons) {
+                $(selector).addEventListener("click", async () => {
+                    try {
+                        const response = await api(endpoint, { method: "POST" });
+                        toast(response.message || "Music action completed.");
+                        await loadLiveData();
+                    } catch (error) {
+                        toast(error.message, "error");
+                    }
+                });
+            }
+
+            $("#add-streamer").addEventListener("click", async () => {
+                try {
+                    const response = await api("/api/streamers/add", {
+                        method: "POST",
+                        body: {
+                            name: selectedValue("#streamer-name"),
+                            platform: selectedValue("#streamer-platform") || "twitch",
+                        },
+                    });
+                    toast("Streamer added.");
+                    $("#streamer-name").value = "";
+                    state.stats.streamers = response.streamers || [];
+                    renderStreamers(state.stats.streamers);
+                    updateSectionCounts();
+                } catch (error) {
+                    toast(error.message, "error");
+                }
+            });
+
+            $("#add-banned-word").addEventListener("click", async () => {
+                try {
+                    const response = await api("/api/banned-words/add", {
+                        method: "POST",
+                        body: { word: selectedValue("#banned-word-input") },
+                    });
+                    state.bannedWords = response.words || [];
+                    $("#banned-word-input").value = "";
+                    renderSafety();
+                    updateSectionCounts();
+                    toast("Banned word added.");
+                } catch (error) {
+                    toast(error.message, "error");
+                }
+            });
+
+            $("#add-reaction-role").addEventListener("click", async () => {
+                try {
+                    const response = await api("/api/reaction-roles/add", {
+                        method: "POST",
+                        body: {
+                            channel_id: selectedValue("#reaction-role-channel"),
+                            role_id: selectedValue("#reaction-role-role"),
+                            message_id: selectedValue("#reaction-role-message-id"),
+                            emoji: selectedValue("#reaction-role-emoji"),
+                        },
+                    });
+                    toast(response.message || "Reaction role added.");
+                    $("#reaction-role-message-id").value = "";
+                    $("#reaction-role-emoji").value = "";
+                    await loadLiveData();
+                } catch (error) {
+                    toast(error.message, "error");
+                }
+            });
+
+            $("#lookup-rank").addEventListener("click", async () => {
+                try {
+                    const userId = selectedValue("#rank-member");
+                    if (!userId) {
+                        throw new Error("Select a member first.");
+                    }
+                    const response = await api(`/api/rank?user_id=${encodeURIComponent(userId)}`);
+                    const percent = response.next_level_xp ? Math.max(0, Math.min(100, Math.round((Number(response.progress || 0) / Number(response.next_level_xp || 1)) * 100))) : 0;
+                    $("#rank-result").innerHTML = `
+                        <strong>${escapeHtml(response.name)}</strong><br>
+                        Level ${escapeHtml(response.level)} with ${formatNumber(response.xp)} XP.<br>
+                        Progress: ${formatNumber(response.progress)} / ${formatNumber(response.next_level_xp)}
+                        <div class="progress-shell" style="margin-top:12px;"><div class="progress-bar" style="width:${percent}%;"></div></div>
+                    `;
+                } catch (error) {
+                    toast(error.message, "error");
+                }
+            });
+
+            $("#post-lfg").addEventListener("click", async () => {
+                try {
+                    const response = await api("/api/lfg", {
+                        method: "POST",
+                        body: {
+                            channel_id: selectedValue("#lfg-channel"),
+                            game: selectedValue("#lfg-game"),
+                            players: Number(selectedValue("#lfg-players") || 2),
+                            message: selectedValue("#lfg-message"),
+                        },
+                    });
+                    toast(response.message || "LFG posted.");
+                    $("#lfg-game").value = "";
+                    $("#lfg-message").value = "";
+                } catch (error) {
+                    toast(error.message, "error");
+                }
+            });
+
+            $("#pokecoins-update").addEventListener("click", async () => {
+                try {
+                    const userId = selectedValue("#pokecoins-member");
+                    if (!userId) {
+                        throw new Error("Select a member first.");
+                    }
+                    const response = await api("/api/pokecoins/give", {
+                        method: "POST",
+                        body: {
+                            user_id: userId,
+                            amount: Number(selectedValue("#pokecoins-amount") || 0),
+                        },
+                    });
+                    $("#pokecoins-result").textContent = `${response.message} New balance: ${formatNumber(response.new_balance || 0)}.`;
+                    toast(response.message || "PokeCoins updated.");
+                    await loadLiveData();
+                } catch (error) {
+                    toast(error.message, "error");
+                }
+            });
+
+            $("#pokecoins-balance").addEventListener("click", async () => {
+                try {
+                    const userId = selectedValue("#pokecoins-member");
+                    if (!userId) {
+                        throw new Error("Select a member first.");
+                    }
+                    const response = await api(`/api/pokecoins/balance?user_id=${encodeURIComponent(userId)}`);
+                    $("#pokecoins-result").textContent = `${response.name} currently has ${formatNumber(response.balance || 0)} PokeCoins.`;
+                } catch (error) {
+                    toast(error.message, "error");
+                }
+            });
+
+            document.addEventListener("click", async (event) => {
+                const target = event.target;
+                if (!(target instanceof HTMLElement)) {
+                    return;
+                }
+                if (target.matches("[data-remove-word]")) {
+                    try {
+                        const response = await api("/api/banned-words/remove", {
+                            method: "POST",
+                            body: { word: target.dataset.removeWord },
+                        });
+                        state.bannedWords = response.words || [];
+                        renderSafety();
+                        updateSectionCounts();
+                        toast("Banned word removed.");
+                    } catch (error) {
+                        toast(error.message, "error");
+                    }
+                }
+                if (target.matches("[data-clear-warning]")) {
+                    try {
+                        const response = await api("/api/warnings/clear", {
+                            method: "POST",
+                            body: { user_id: target.dataset.clearWarning },
+                        });
+                        state.warnings = response.warnings || [];
+                        renderModeration();
+                        updateSectionCounts();
+                        toast("Warnings cleared.");
+                    } catch (error) {
+                        toast(error.message, "error");
+                    }
+                }
+                if (target.matches("[data-end-giveaway]")) {
+                    try {
+                        const response = await api("/api/giveaways/end", {
+                            method: "POST",
+                            body: { message_id: target.dataset.endGiveaway },
+                        });
+                        toast(response.message || "Giveaway flagged to end.");
+                        await loadLiveData();
+                    } catch (error) {
+                        toast(error.message, "error");
+                    }
+                }
+                if (target.matches("[data-unban-id]")) {
+                    try {
+                        await performUnban(target.dataset.unbanId);
+                    } catch (error) {
+                        toast(error.message, "error");
+                    }
+                }
+                if (target.matches("[data-remove-streamer]")) {
+                    try {
+                        const response = await api("/api/streamers/remove", {
+                            method: "POST",
+                            body: { name: target.dataset.removeStreamer },
+                        });
+                        state.stats.streamers = response.streamers || [];
+                        renderStreamers(state.stats.streamers);
+                        updateSectionCounts();
+                        toast("Streamer removed.");
+                    } catch (error) {
+                        toast(error.message, "error");
+                    }
+                }
+            });
+        }
+
+        function bindSectionObserver() {
+            const sections = $$('[data-observe-section]');
+            const links = $$('[data-section-link]');
+            const observer = new IntersectionObserver((entries) => {
+                const visible = entries
+                    .filter((entry) => entry.isIntersecting)
+                    .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+                if (!visible) {
+                    return;
+                }
+                const id = visible.target.getAttribute("data-observe-section");
+                for (const link of links) {
+                    link.classList.toggle("active", link.dataset.sectionLink === id);
+                }
+            }, { threshold: [0.25, 0.55], rootMargin: "-10% 0px -55% 0px" });
+
+            for (const section of sections) {
+                observer.observe(section);
+            }
+        }
+
+        async function initDashboard() {
+            bindButtons();
+            bindSectionObserver();
+            await refreshAll(false);
+            window.setInterval(() => {
+                loadLiveData().catch((error) => toast(error.message, "error"));
+            }, 45000);
+        }
+
+        initDashboard();
+    </script>
+</body>
+</html>

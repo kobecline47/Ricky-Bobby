@@ -67,6 +67,8 @@ def init(
     bot_client,
     guild_id: int,
     bot_loop,
+    community_profiles=None,
+    squads=None,
     search_youtube_fn=None,
     play_next_fn=None,
     song_entry_cls=None,
@@ -84,6 +86,8 @@ def init(
         whitelist=whitelist,
         music_states=music_states,
         reaction_roles=reaction_roles,
+        community_profiles=community_profiles or {},
+        squads=squads or {},
         client=bot_client,
         guild_id=guild_id,
         bot_loop=bot_loop,
@@ -238,6 +242,84 @@ def api_stats():
         "giveaways":        giveaway_list,
         "streamers":        list(streamers),
         "music":            music_info,
+    })
+
+
+@app.route("/api/analytics/community")
+def api_analytics_community():
+    if not _logged_in(): return _unauth()
+
+    profiles = _state.get("community_profiles", {})
+    squads = _state.get("squads", {})
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    today_key = now.date().isoformat()
+    year, week, _ = now.date().isocalendar()
+    week_key = f"{year}-W{week:02d}"
+
+    total_profiles = 0
+    dau = 0
+    wau = 0
+    journey_complete = 0
+    active_streaks = 0
+    avg_points_sum = 0
+
+    for uid, profile in (profiles.items() if isinstance(profiles, dict) else []):
+        if not isinstance(profile, dict):
+            continue
+        total_profiles += 1
+        avg_points_sum += int(profile.get("points", 0))
+        if profile.get("journey_complete"):
+            journey_complete += 1
+        if int(profile.get("streak", 0)) > 0:
+            active_streaks += 1
+
+        last_active_raw = profile.get("last_active_at", "")
+        try:
+            last_active = datetime.datetime.fromisoformat(str(last_active_raw).replace("Z", "+00:00"))
+            age_sec = (now - last_active.astimezone(datetime.timezone.utc)).total_seconds()
+            if age_sec <= 86400:
+                dau += 1
+            if age_sec <= 7 * 86400:
+                wau += 1
+        except Exception:
+            pass
+
+        if profile.get("day_key") == today_key and int(profile.get("msg_day", 0)) > 0:
+            dau = max(dau, 1)
+        if profile.get("week_key") == week_key and int(profile.get("msg_week", 0)) > 0:
+            wau = max(wau, 1)
+
+    squad_rows = []
+    if isinstance(squads, dict):
+        for key, squad in squads.items():
+            if not isinstance(squad, dict):
+                continue
+            mission = squad.get("mission") if isinstance(squad.get("mission"), dict) else {}
+            squad_rows.append({
+                "name": squad.get("name", key),
+                "points": int(squad.get("points", 0)),
+                "members": len(squad.get("members", [])),
+                "mission_target": int(mission.get("target", 0)),
+                "mission_claimed": bool(mission.get("claimed", False)),
+            })
+    squad_rows.sort(key=lambda row: (-row["points"], row["name"].casefold()))
+
+    avg_points = (avg_points_sum / total_profiles) if total_profiles else 0.0
+    journey_completion_rate = (journey_complete / total_profiles) if total_profiles else 0.0
+
+    return jsonify({
+        "totals": {
+            "profiles": total_profiles,
+            "squads": len(squad_rows),
+            "dau": dau,
+            "wau": wau,
+            "journey_completed": journey_complete,
+            "journey_completion_rate": round(journey_completion_rate, 4),
+            "active_streaks": active_streaks,
+            "avg_points": round(avg_points, 2),
+        },
+        "top_squads": squad_rows[:10],
     })
 
 
